@@ -36,7 +36,7 @@
 
 		try {
 			const response = await fetch(
-				`${serverUrl}/library/sections/${libraryId}/all?type=${type === 'movie' ? 1 : 2}`,
+				`${serverUrl}/library/sections/${libraryId}/all?type=${type === 'movie' ? 1 : 2}&includeFields=Media.Part.Stream`,
 				{ headers }
 			);
 
@@ -72,6 +72,41 @@
 			return sortDirection === 'asc'
 				? aVal.toString().localeCompare(bVal.toString())
 				: bVal.toString().localeCompare(aVal.toString());
+		});
+	}
+
+	function formatDuration(ms: number): string {
+		const hours = Math.floor(ms / 3600000);
+		const minutes = Math.floor((ms % 3600000) / 60000);
+		const seconds = Math.floor((ms % 60000) / 1000);
+		return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+	}
+
+	function formatFileSize(bytes: number): string {
+		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+		let size = bytes;
+		let unitIndex = 0;
+		while (size >= 1024 && unitIndex < units.length - 1) {
+			size /= 1024;
+			unitIndex++;
+		}
+		return `${size.toFixed(2)} ${units[unitIndex]}`;
+	}
+
+	function formatBitrate(bitrate: number): string {
+		// Simply return the total bitrate from the API
+		return `${bitrate} Kbps`;
+	}
+
+	function debugMovie(movie: any) {
+		const mediaInfo = movie.Media?.[0] || {};
+		const streams = mediaInfo.Part?.[0]?.Stream || [];
+
+		console.log('Movie Debug Data:', {
+			title: movie.title,
+			totalBitrate: mediaInfo.bitrate,
+			streams, // Log all streams without making assumptions about their types
+			fullData: movie
 		});
 	}
 
@@ -127,6 +162,12 @@
 					<table class="min-w-full divide-y divide-gray-200">
 						<thead class="bg-gray-50">
 							<tr>
+								<th class="w-10 px-2 py-3"></th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+								>
+									Poster
+								</th>
 								<th
 									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
 									on:click={() => handleSort('title')}
@@ -137,7 +178,7 @@
 									{/if}
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-20"
 									on:click={() => handleSort('year')}
 								>
 									Year
@@ -146,53 +187,97 @@
 									{/if}
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-									on:click={() => handleSort('duration')}
+									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
 								>
-									Duration
-									{#if sortField === 'duration'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
+									Runtime
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-									on:click={() => handleSort('rating')}
+									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
 								>
-									Rating
-									{#if sortField === 'rating'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
+									Size
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
+								>
+									Format
+								</th>
+								<th
+									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
+								>
+									Bitrate
 								</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-200">
 							{#each media as item}
 								<tr class="hover:bg-gray-50">
-									<td class="px-6 py-4 whitespace-nowrap">
-										<div class="flex items-center">
-											{#if item.thumb}
-												<img
-													src={`${localStorage.getItem('plexServerUrl')}${item.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
-													alt={item.title}
-													class="h-10 w-auto rounded mr-3"
+									<td class="px-2 py-4">
+										<button
+											on:click={() => debugMovie(item)}
+											class="text-gray-400 hover:text-gray-600 transition-colors"
+											title="Debug movie data"
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												class="h-5 w-5"
+												viewBox="0 0 20 20"
+												fill="currentColor"
+											>
+												<path
+													fill-rule="evenodd"
+													d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
+													clip-rule="evenodd"
 												/>
+											</svg>
+										</button>
+									</td>
+									<td class="px-6 py-4">
+										{#if item.thumb}
+											<img
+												src={`${localStorage.getItem('plexServerUrl')}${item.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
+												alt={item.title}
+												class="h-24 w-auto rounded shadow-sm"
+											/>
+										{/if}
+									</td>
+									<td class="px-6 py-4">
+										<div>
+											<div class="text-sm font-medium text-gray-900">{item.title}</div>
+											{#if item.originalTitle && item.originalTitle !== item.title}
+												<div class="text-sm text-gray-500">{item.originalTitle}</div>
 											{/if}
-											<div>
-												<div class="text-sm font-medium text-gray-900">{item.title}</div>
-												{#if item.originalTitle && item.originalTitle !== item.title}
-													<div class="text-sm text-gray-500">{item.originalTitle}</div>
-												{/if}
-											</div>
 										</div>
 									</td>
-									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+									<td class="px-6 py-4 text-sm text-gray-500">
 										{item.year || '-'}
 									</td>
-									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-										{Math.floor(item.duration / 60000)} min
+									<td class="px-6 py-4 text-sm text-gray-500 font-mono">
+										{formatDuration(item.duration)}
 									</td>
-									<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-										{item.rating ? `${item.rating}/10` : '-'}
+									<td class="px-6 py-4 text-sm text-gray-500">
+										{#if item.Media?.[0]?.Part?.[0]?.size}
+											{formatFileSize(item.Media[0].Part[0].size)}
+										{:else}
+											-
+										{/if}
+									</td>
+									<td class="px-6 py-4">
+										{#if item.Media?.[0]?.videoCodec}
+											<span
+												class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+											>
+												{item.Media[0].videoCodec.toUpperCase()}
+											</span>
+										{:else}
+											-
+										{/if}
+									</td>
+									<td class="px-6 py-4 text-sm text-gray-500">
+										{#if item.Media?.[0]?.bitrate}
+											{formatBitrate(item.Media[0].bitrate)}
+										{:else}
+											-
+										{/if}
 									</td>
 								</tr>
 							{/each}
