@@ -8,9 +8,16 @@
 	let error: string | null = null;
 	let sortField = 'title';
 	let sortDirection = 'asc';
+	let searchQuery = '';
+	let detailedMedia = new Map<string, any>(); // Store detailed info by ratingKey
 
 	$: libraryId = $page.params.id;
 	$: type = $page.url.searchParams.get('type');
+	$: filteredMedia = media.filter(
+		(item) =>
+			item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			(item.originalTitle && item.originalTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+	);
 
 	async function fetchMedia() {
 		const token = localStorage.getItem('plexToken');
@@ -31,12 +38,23 @@
 			'X-Plex-Platform': 'Web',
 			'X-Plex-Platform-Version': '1.0.0',
 			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web'
+			'X-Plex-Device-Name': 'Plexman Web',
+			'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
+			'X-Plex-Language': 'en',
+			'X-Plex-Provider-Version': '7.2'
 		};
 
 		try {
+			// First get the list of movies
 			const response = await fetch(
-				`${serverUrl}/library/sections/${libraryId}/all?type=${type === 'movie' ? 1 : 2}&includeFields=Media.Part.Stream`,
+				`${serverUrl}/library/sections/${libraryId}/all?` +
+					new URLSearchParams({
+						type: type === 'movie' ? '1' : '2',
+						includeExternalMedia: '1',
+						includePreferences: '1',
+						checkFiles: '1',
+						asyncCheckFiles: '0'
+					}),
 				{ headers }
 			);
 
@@ -94,20 +112,68 @@
 	}
 
 	function formatBitrate(bitrate: number): string {
-		// Simply return the total bitrate from the API
+		const item = media.find((m) => m.Media?.[0]?.bitrate === bitrate);
+		if (!item) return `${bitrate} Kbps`;
+
+		const mediaInfo = item.Media?.[0];
+		if (!mediaInfo) return `${bitrate} Kbps`;
+
+		const streams = mediaInfo.Part?.[0]?.Stream;
+		if (!streams) return `${bitrate} Kbps`;
+
+		// Get video stream bitrate directly from API
+		const videoStream = streams.find((s: any) => s.streamType === 1);
+		if (videoStream?.bitrate) {
+			return `${videoStream.bitrate} Kbps`;
+		}
+
+		// If no video stream bitrate, return total
 		return `${bitrate} Kbps`;
 	}
 
-	function debugMovie(movie: any) {
-		const mediaInfo = movie.Media?.[0] || {};
-		const streams = mediaInfo.Part?.[0]?.Stream || [];
+	async function debugMovie(movie: any) {
+		const token = localStorage.getItem('plexToken');
+		const clientId = localStorage.getItem('plexClientId');
+		const serverUrl = localStorage.getItem('plexServerUrl');
 
-		console.log('Movie Debug Data:', {
-			title: movie.title,
-			totalBitrate: mediaInfo.bitrate,
-			streams, // Log all streams without making assumptions about their types
-			fullData: movie
-		});
+		if (!token || !clientId || !serverUrl) return;
+
+		const headers = {
+			Accept: 'application/json',
+			'X-Plex-Token': token,
+			'X-Plex-Client-Identifier': clientId,
+			'X-Plex-Product': 'Plexman',
+			'X-Plex-Version': '1.0.0',
+			'X-Plex-Platform': 'Web',
+			'X-Plex-Platform-Version': '1.0.0',
+			'X-Plex-Device': 'Browser',
+			'X-Plex-Device-Name': 'Plexman Web',
+			'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
+			'X-Plex-Language': 'en',
+			'X-Plex-Provider-Version': '7.2'
+		};
+
+		try {
+			const response = await fetch(
+				`${serverUrl}/library/metadata/${movie.ratingKey}?` +
+					new URLSearchParams({
+						includeExternalMedia: '1',
+						includePreferences: '1',
+						checkFiles: '1',
+						asyncCheckFiles: '0'
+					}),
+				{ headers }
+			);
+
+			if (!response.ok) return;
+
+			const data = await response.json();
+			const item = data.MediaContainer.Metadata[0];
+			detailedMedia.set(movie.ratingKey, item);
+			detailedMedia = detailedMedia; // Trigger reactivity
+		} catch (e) {
+			console.error('Failed to fetch detailed metadata:', e);
+		}
 	}
 
 	onMount(() => {
@@ -157,19 +223,48 @@
 				</div>
 			</div>
 		{:else}
+			<div class="mb-4">
+				<div class="relative">
+					<input
+						type="text"
+						bind:value={searchQuery}
+						placeholder="Search movies..."
+						class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+					/>
+					{#if searchQuery}
+						<button
+							on:click={() => (searchQuery = '')}
+							class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+						>
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-5 w-5"
+								viewBox="0 0 20 20"
+								fill="currentColor"
+							>
+								<path
+									fill-rule="evenodd"
+									d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+									clip-rule="evenodd"
+								/>
+							</svg>
+						</button>
+					{/if}
+				</div>
+			</div>
 			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
 				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
+					<table class="min-w-full divide-y divide-gray-200 text-sm">
 						<thead class="bg-gray-50">
 							<tr>
-								<th class="w-10 px-2 py-3"></th>
+								<th class="w-8 px-1 py-2"></th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
 								>
 									Poster
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
 									on:click={() => handleSort('title')}
 								>
 									Title
@@ -178,7 +273,7 @@
 									{/if}
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-20"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-16"
 									on:click={() => handleSort('year')}
 								>
 									Year
@@ -187,31 +282,41 @@
 									{/if}
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
 								>
 									Runtime
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
 								>
 									Size
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
 								>
 									Format
 								</th>
 								<th
-									class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
 								>
-									Bitrate
+									Overall
+								</th>
+								<th
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>
+									Video
+								</th>
+								<th
+									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>
+									Audio
 								</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-200">
-							{#each media as item}
+							{#each filteredMedia as item}
 								<tr class="hover:bg-gray-50">
-									<td class="px-2 py-4">
+									<td class="px-1 py-2">
 										<button
 											on:click={() => debugMovie(item)}
 											class="text-gray-400 hover:text-gray-600 transition-colors"
@@ -219,7 +324,7 @@
 										>
 											<svg
 												xmlns="http://www.w3.org/2000/svg"
-												class="h-5 w-5"
+												class="h-4 w-4"
 												viewBox="0 0 20 20"
 												fill="currentColor"
 											>
@@ -231,40 +336,54 @@
 											</svg>
 										</button>
 									</td>
-									<td class="px-6 py-4">
+									<td class="px-3 py-2">
 										{#if item.thumb}
 											<img
 												src={`${localStorage.getItem('plexServerUrl')}${item.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
 												alt={item.title}
-												class="h-24 w-auto rounded shadow-sm"
+												class="h-16 w-auto rounded shadow-sm"
+												loading="lazy"
+												decoding="async"
 											/>
 										{/if}
 									</td>
-									<td class="px-6 py-4">
+									<td class="px-3 py-2">
 										<div>
-											<div class="text-sm font-medium text-gray-900">{item.title}</div>
+											<div class="text-sm font-medium text-gray-900 leading-tight">
+												{item.title}
+											</div>
 											{#if item.originalTitle && item.originalTitle !== item.title}
-												<div class="text-sm text-gray-500">{item.originalTitle}</div>
+												<div class="text-xs text-gray-500 leading-tight">{item.originalTitle}</div>
 											{/if}
 										</div>
 									</td>
-									<td class="px-6 py-4 text-sm text-gray-500">
+									<td class="px-3 py-2 text-xs text-gray-500">
 										{item.year || '-'}
 									</td>
-									<td class="px-6 py-4 text-sm text-gray-500 font-mono">
+									<td class="px-3 py-2 text-xs text-gray-500">
 										{formatDuration(item.duration)}
 									</td>
-									<td class="px-6 py-4 text-sm text-gray-500">
+									<td class="px-3 py-2 text-xs text-gray-500">
 										{#if item.Media?.[0]?.Part?.[0]?.size}
 											{formatFileSize(item.Media[0].Part[0].size)}
 										{:else}
 											-
 										{/if}
 									</td>
-									<td class="px-6 py-4">
+									<td class="px-3 py-2">
 										{#if item.Media?.[0]?.videoCodec}
+											{@const codec = item.Media[0].videoCodec.toLowerCase()}
 											<span
-												class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+												class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {codec ===
+												'hevc'
+													? 'bg-green-100 text-green-800'
+													: codec === 'h264'
+														? 'bg-blue-100 text-blue-800'
+														: codec === 'mpeg4'
+															? 'bg-yellow-100 text-yellow-800'
+															: codec === 'mpeg2video'
+																? 'bg-red-100 text-red-800'
+																: 'bg-gray-100 text-gray-800'}"
 											>
 												{item.Media[0].videoCodec.toUpperCase()}
 											</span>
@@ -272,9 +391,55 @@
 											-
 										{/if}
 									</td>
-									<td class="px-6 py-4 text-sm text-gray-500">
+									<td class="px-3 py-2 text-xs text-gray-500">
 										{#if item.Media?.[0]?.bitrate}
-											{formatBitrate(item.Media[0].bitrate)}
+											{item.Media[0].bitrate} Kbps
+										{:else}
+											-
+										{/if}
+									</td>
+									<td class="px-3 py-2 text-xs text-gray-500">
+										{#if detailedMedia.get(item.ratingKey)?.Media?.[0]?.Part?.[0]?.Stream}
+											{@const videoStream = detailedMedia
+												.get(item.ratingKey)
+												.Media[0].Part[0].Stream.find((s: any) => s.streamType === 1)}
+											{#if videoStream?.bitrate}
+												{videoStream.bitrate} Kbps
+											{:else}
+												-
+											{/if}
+										{:else if item.Media?.[0]?.Part?.[0]?.Stream}
+											{@const videoStream = item.Media[0].Part[0].Stream.find(
+												(s: any) => s.streamType === 1
+											)}
+											{#if videoStream?.bitrate}
+												{videoStream.bitrate} Kbps
+											{:else}
+												-
+											{/if}
+										{:else}
+											-
+										{/if}
+									</td>
+									<td class="px-3 py-2 text-xs text-gray-500">
+										{#if detailedMedia.get(item.ratingKey)?.Media?.[0]?.Part?.[0]?.Stream}
+											{@const audioStream = detailedMedia
+												.get(item.ratingKey)
+												.Media[0].Part[0].Stream.find((s: any) => s.streamType === 2)}
+											{#if audioStream?.bitrate}
+												{audioStream.bitrate} Kbps
+											{:else}
+												-
+											{/if}
+										{:else if item.Media?.[0]?.Part?.[0]?.Stream}
+											{@const audioStream = item.Media[0].Part[0].Stream.find(
+												(s: any) => s.streamType === 2
+											)}
+											{#if audioStream?.bitrate}
+												{audioStream.bitrate} Kbps
+											{:else}
+												-
+											{/if}
 										{:else}
 											-
 										{/if}
