@@ -43,8 +43,12 @@
 
 			if (!server) throw new Error('No Plex server found');
 
+			// Store the server URL for later use
+			const serverUrl = server.connections[0].uri;
+			localStorage.setItem('plexServerUrl', serverUrl);
+
 			// Then fetch the libraries from the first server
-			const libraryResponse = await fetch(`${server.connections[0].uri}/library/sections`, {
+			const libraryResponse = await fetch(`${serverUrl}/library/sections`, {
 				headers
 			});
 
@@ -122,7 +126,10 @@
 		{:else}
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{#each libraries as library}
-					<div class="bg-white overflow-hidden shadow rounded-lg">
+					<a
+						href={`/library/${library.key}?type=${library.type}`}
+						class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
+					>
 						<div class="px-4 py-5 sm:p-6">
 							<div class="flex items-center">
 								<div class="flex-shrink-0 bg-orange-100 rounded-md p-3">
@@ -166,7 +173,7 @@
 								</div>
 							</div>
 						</div>
-					</div>
+					</a>
 				{/each}
 			</div>
 		{/if}
