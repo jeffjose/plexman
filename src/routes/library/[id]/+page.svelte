@@ -3,12 +3,38 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import MovieRow from './MovieRow.svelte';
+	import ShowRow from './ShowRow.svelte';
 	import { writable, derived } from 'svelte/store';
 
-	let media: any[] = [];
+	interface Stream {
+		streamType: number;
+		bitrate?: number;
+	}
+
+	interface MediaPart {
+		size: number;
+		Stream?: Stream[];
+	}
+
+	interface MediaItem {
+		bitrate?: number;
+		Part?: MediaPart[];
+	}
+
+	interface PlexItem {
+		ratingKey: string;
+		title: string;
+		originalTitle?: string;
+		year?: number;
+		originallyAvailableAt?: string;
+		Media?: MediaItem[];
+		[key: string]: any; // Allow any string key for dynamic access
+	}
+
+	let media: PlexItem[] = [];
 	let loading = true;
 	let error: string | null = null;
-	let sortField = 'title';
+	let sortField = 'originallyAvailableAt';
 	let sortDirection = 'asc';
 
 	const searchQuery = writable('');
@@ -25,7 +51,7 @@
 	}
 
 	$: libraryId = $page.params.id;
-	$: type = $page.url.searchParams.get('type');
+	$: type = $page.url.searchParams.get('type') || 'movie';
 
 	const filteredMedia = derived(
 		[searchQuery, sortFieldStore, sortDirectionStore],
@@ -33,12 +59,14 @@
 			// First filter the media
 			let result = !$searchQuery
 				? media
-				: media.filter(
-						(item) =>
-							item.title.toLowerCase().includes($searchQuery.toLowerCase()) ||
-							(item.originalTitle &&
-								item.originalTitle.toLowerCase().includes($searchQuery.toLowerCase()))
-					);
+				: media.filter((item) => {
+						const searchLower = $searchQuery.toLowerCase();
+						return (
+							item.title.toLowerCase().includes(searchLower) ||
+							(item.originalTitle || '').toLowerCase().includes(searchLower) ||
+							(type === 'show' && item.year?.toString().includes(searchLower))
+						);
+					});
 
 			// Then sort the filtered results
 			return [...result].sort((a, b) => {
@@ -54,32 +82,21 @@
 						const aDetailed = detailedMedia.get(a.ratingKey);
 						const bDetailed = detailedMedia.get(b.ratingKey);
 						aVal =
-							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
+							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
 								?.bitrate ||
-							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
+							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
 							0;
 						bVal =
-							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
+							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
 								?.bitrate ||
-							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
+							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
 							0;
 						break;
 					}
-					case 'audioBitrate': {
-						const aDetailed = detailedMedia.get(a.ratingKey);
-						const bDetailed = detailedMedia.get(b.ratingKey);
-						aVal =
-							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)
-								?.bitrate ||
-							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)?.bitrate ||
-							0;
-						bVal =
-							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)
-								?.bitrate ||
-							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)?.bitrate ||
-							0;
+					case 'originallyAvailableAt':
+						aVal = a.originallyAvailableAt || '';
+						bVal = b.originallyAvailableAt || '';
 						break;
-					}
 					default:
 						aVal = a[$sortField] || '';
 						bVal = b[$sortField] || '';
@@ -116,18 +133,14 @@
 			'X-Plex-Platform': 'Web',
 			'X-Plex-Platform-Version': '1.0.0',
 			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web',
-			'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
-			'X-Plex-Language': 'en',
-			'X-Plex-Provider-Version': '7.2'
+			'X-Plex-Device-Name': 'Plexman Web'
 		};
 
 		try {
-			// First get the list of movies
 			const response = await fetch(
 				`${serverUrl}/library/sections/${libraryId}/all?` +
 					new URLSearchParams({
-						type: type === 'movie' ? '1' : '2',
+						type: type === 'show' ? '2' : '1',
 						includeExternalMedia: '1',
 						includePreferences: '1',
 						checkFiles: '1',
@@ -193,20 +206,20 @@
 
 	// Calculate all sizes and bitrates for percentiles
 	$: allSizes = media
-		.flatMap((item) => item.Media?.map((m) => m?.Part?.[0]?.size || 0) || [])
+		.flatMap((item) => item.Media?.map((m: MediaItem) => m?.Part?.[0]?.size || 0) || [])
 		.filter((size) => size > 0);
 	$: allOverallBitrates = media
-		.flatMap((item) => item.Media?.map((m) => m?.bitrate || 0) || [])
+		.flatMap((item) => item.Media?.map((m: MediaItem) => m?.bitrate || 0) || [])
 		.filter((br) => br > 0);
 	$: allVideoBitrates = media
 		.flatMap(
 			(item) =>
-				item.Media?.map((m) => {
+				item.Media?.map((m: MediaItem) => {
 					const detailed = detailedMedia.get(item.ratingKey);
 					return (
-						detailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
+						detailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
 							?.bitrate ||
-						m?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
+						m?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
 						0
 					);
 				}) || []
@@ -231,7 +244,7 @@
 		if (!streams) return `${bitrate} Kbps`;
 
 		// Get video stream bitrate directly from API
-		const videoStream = streams.find((s: any) => s.streamType === 1);
+		const videoStream = streams.find((s: Stream) => s.streamType === 1);
 		if (videoStream?.bitrate) {
 			return `${videoStream.bitrate} Kbps`;
 		}
@@ -286,27 +299,40 @@
 	}
 
 	onMount(() => {
-		if (type !== 'movie') {
-			error = 'Only movie libraries are supported at the moment';
-			loading = false;
-			return;
-		}
 		fetchMedia();
 	});
 </script>
 
 <div class="min-h-screen bg-gray-100">
 	<nav class="bg-white shadow-sm">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-			<div class="flex justify-between h-16">
-				<div class="flex items-center">
-					<a href="/" class="text-2xl font-bold text-gray-900">Plexman</a>
+		<div class="max-w-7xl mx-auto px-4">
+			<div class="flex justify-between h-12">
+				<div class="flex items-center space-x-4">
+					<a href="/" class="text-lg font-bold text-gray-900">Plexman</a>
+					<div class="flex space-x-2">
+						<a
+							href="/library/{libraryId}?type=movie"
+							class="px-2 py-1 rounded text-sm font-medium {type === 'movie'
+								? 'bg-orange-100 text-orange-700'
+								: 'text-gray-500 hover:text-gray-700'}"
+						>
+							Movies
+						</a>
+						<a
+							href="/library/{libraryId}?type=show"
+							class="px-2 py-1 rounded text-sm font-medium {type === 'show'
+								? 'bg-orange-100 text-orange-700'
+								: 'text-gray-500 hover:text-gray-700'}"
+						>
+							TV Shows
+						</a>
+					</div>
 				</div>
 			</div>
 		</div>
 	</nav>
 
-	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+	<main class="max-w-7xl mx-auto py-2 px-2 sm:px-4">
 		{#if loading}
 			<div class="flex justify-center items-center h-64">
 				<div
@@ -332,14 +358,14 @@
 				</div>
 			</div>
 		{:else}
-			<div class="mb-4">
+			<div class="mb-2">
 				<div class="relative">
 					<input
 						type="text"
 						bind:value={searchInput}
 						on:input={() => debounceSearch(searchInput)}
-						placeholder="Search movies..."
-						class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+						placeholder={type === 'show' ? 'Search TV shows...' : 'Search movies...'}
+						class="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
 					/>
 					{#if searchInput}
 						<button
@@ -347,11 +373,11 @@
 								searchInput = '';
 								searchQuery.set('');
 							}}
-							class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+							class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
 						>
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5"
+								class="h-4 w-4"
 								viewBox="0 0 20 20"
 								fill="currentColor"
 							>
@@ -365,77 +391,84 @@
 					{/if}
 				</div>
 			</div>
+
 			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
 				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th class="px-1 py-1 w-12"></th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-								>
-									Title
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
-								>
-									Year
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Duration
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-								>
-									<div class="flex items-center space-x-2">
-										<div class="w-14">Size</div>
-										<div class="w-24">Format</div>
-										<div
-											class="w-14 cursor-pointer hover:bg-gray-100"
-											on:click={() => handleSort('overallBitrate')}
-										>
-											Overall
-											{#if sortField === 'overallBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
+					{#if type === 'movie'}
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="px-1 py-1 w-12"></th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
+										Title
+									</th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
+									>
+										Year
+									</th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+									>
+										Duration
+									</th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
+										<div class="flex items-center space-x-2">
+											<div class="w-14">Size</div>
+											<div class="w-24">Format</div>
+											<button
+												type="button"
+												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+												on:click={() => handleSort('overallBitrate')}
+												on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
+											>
+												Overall
+												{#if sortField === 'overallBitrate'}
+													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+												on:click={() => handleSort('videoBitrate')}
+												on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
+											>
+												Video
+												{#if sortField === 'videoBitrate'}
+													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+											<div class="w-14">Audio</div>
 										</div>
-										<div
-											class="w-14 cursor-pointer hover:bg-gray-100"
-											on:click={() => handleSort('videoBitrate')}
-										>
-											Video
-											{#if sortField === 'videoBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</div>
-										<div
-											class="w-14 cursor-pointer hover:bg-gray-100"
-											on:click={() => handleSort('audioBitrate')}
-										>
-											Audio
-											{#if sortField === 'audioBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</div>
-									</div>
-								</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-200">
-							{#each $filteredMedia as item (item.ratingKey)}
-								<MovieRow
-									{item}
-									{detailedMedia}
-									onDebug={debugMovie}
-									{formatDuration}
-									{formatFileSize}
-									{getPercentiles}
-								/>
+									</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								{#each $filteredMedia as item (item.ratingKey)}
+									<MovieRow
+										{item}
+										{detailedMedia}
+										onDebug={debugMovie}
+										{formatDuration}
+										{formatFileSize}
+										{getPercentiles}
+									/>
+								{/each}
+							</tbody>
+						</table>
+					{:else}
+						<div
+							class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 p-2"
+						>
+							{#each $filteredMedia as show (show.ratingKey)}
+								<ShowRow {show} />
 							{/each}
-						</tbody>
-					</table>
+						</div>
+					{/if}
 				</div>
 			</div>
 		{/if}
