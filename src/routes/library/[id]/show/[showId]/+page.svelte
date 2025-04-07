@@ -447,19 +447,21 @@
 										{formatDuration(episode.duration)}
 									</td>
 									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
-											{@const videoStream = episode.Media[0].Part[0].Stream.find(
-												(s: any) => s.streamType === 1
-											)}
-											{videoStream?.codec === 'hevc'
+										{#if episode.Media?.[0]}
+											{@const media = episode.Media[0]}
+											{media.videoCodec === 'hevc'
 												? 'HEVC'
-												: videoStream?.codec?.toUpperCase() || '—'}
+												: media.videoCodec?.toUpperCase() || '—'}
 										{:else}
 											—
 										{/if}
 									</td>
 									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{episode.Media?.[0]?.bitrate ? `${episode.Media[0].bitrate} Kbps` : '—'}
+										{#if episode.Media?.[0]?.bitrate}
+											{episode.Media[0].bitrate} Kbps
+										{:else}
+											—
+										{/if}
 									</td>
 									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
 										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
@@ -468,7 +470,15 @@
 											)}
 											{videoStream?.bitrate ? `${videoStream.bitrate} Kbps` : '—'}
 										{:else}
-											—
+											{@const detailedEpisode = detailedMedia.get(episode.ratingKey)}
+											{#if detailedEpisode?.Media?.[0]?.Part?.[0]?.Stream}
+												{@const videoStream = detailedEpisode.Media[0].Part[0].Stream.find(
+													(s: any) => s.streamType === 1
+												)}
+												{videoStream?.bitrate ? `${videoStream.bitrate} Kbps` : '—'}
+											{:else}
+												—
+											{/if}
 										{/if}
 									</td>
 									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
@@ -478,7 +488,15 @@
 											)}
 											{audioStream?.bitrate ? `${audioStream.bitrate} Kbps` : '—'}
 										{:else}
-											—
+											{@const detailedEpisode = detailedMedia.get(episode.ratingKey)}
+											{#if detailedEpisode?.Media?.[0]?.Part?.[0]?.Stream}
+												{@const audioStream = detailedEpisode.Media[0].Part[0].Stream.find(
+													(s: any) => s.streamType === 2
+												)}
+												{audioStream?.bitrate ? `${audioStream.bitrate} Kbps` : '—'}
+											{:else}
+												—
+											{/if}
 										{/if}
 									</td>
 								</tr>
