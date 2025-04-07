@@ -127,7 +127,7 @@
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{#each libraries as library}
 					<a
-						href={`/library/${library.key}?type=${library.type}`}
+						href="/library/{library.key}?type={library.type}"
 						class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
 					>
 						<div class="px-4 py-5 sm:p-6">

@@ -12,6 +12,7 @@
 	let sortField = 'originallyAvailableAt';
 	let sortDirection = 'asc';
 	let observers = new Map();
+	let libraries: any[] = [];
 
 	const searchQuery = writable('');
 	const sortFieldStore = writable(sortField);
@@ -28,6 +29,38 @@
 
 	$: libraryId = $page.params.id;
 	$: showId = $page.params.showId;
+
+	async function fetchLibraries() {
+		const token = localStorage.getItem('plexToken');
+		const clientId = localStorage.getItem('plexClientId');
+		const serverUrl = localStorage.getItem('plexServerUrl');
+
+		if (!token || !clientId || !serverUrl) return;
+
+		const headers = {
+			Accept: 'application/json',
+			'X-Plex-Token': token,
+			'X-Plex-Client-Identifier': clientId,
+			'X-Plex-Product': 'Plexman',
+			'X-Plex-Version': '1.0.0',
+			'X-Plex-Platform': 'Web',
+			'X-Plex-Platform-Version': '1.0.0',
+			'X-Plex-Device': 'Browser',
+			'X-Plex-Device-Name': 'Plexman Web'
+		};
+
+		try {
+			const response = await fetch(`${serverUrl}/library/sections`, { headers });
+			if (!response.ok) return;
+			const data = await response.json();
+			libraries = data.MediaContainer.Directory;
+		} catch (e) {
+			console.error('Failed to fetch libraries:', e);
+		}
+	}
+
+	$: movieLibrary = libraries.find((lib) => lib.type === 'movie')?.key;
+	$: showLibrary = libraries.find((lib) => lib.type === 'show')?.key;
 
 	const filteredEpisodes = derived(
 		[searchQuery, sortFieldStore, sortDirectionStore],
@@ -277,6 +310,7 @@
 
 	onMount(() => {
 		fetchShow();
+		fetchLibraries();
 		return () => {
 			// Cleanup observers on component unmount
 			observers.forEach((observer) => observer.disconnect());
@@ -291,9 +325,24 @@
 			<div class="flex justify-between h-12">
 				<div class="flex items-center space-x-4">
 					<a href="/" class="text-lg font-bold text-gray-900">Plexman</a>
-					<a href="/library/{libraryId}?type=show" class="text-gray-500 hover:text-gray-700">
-						← Back to Shows
-					</a>
+					<div class="flex space-x-2">
+						{#if movieLibrary}
+							<a
+								href="/library/{movieLibrary}"
+								class="px-2 py-1 rounded text-sm font-medium text-gray-500 hover:text-gray-700"
+							>
+								Movies
+							</a>
+						{/if}
+						{#if showLibrary}
+							<a
+								href="/library/{showLibrary}"
+								class="px-2 py-1 rounded text-sm font-medium bg-orange-100 text-orange-700"
+							>
+								TV Shows
+							</a>
+						{/if}
+					</div>
 				</div>
 			</div>
 		</div>
