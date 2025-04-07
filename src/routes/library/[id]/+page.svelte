@@ -41,6 +41,8 @@
 	let allSizes: number[] = [];
 	let allOverallBitrates: number[] = [];
 	let allVideoBitrates: number[] = [];
+	const qualityFilter = writable<string | null>(null);
+	const showMultiFileOnly = writable(false);
 
 	const SORT_OPTIONS = [
 		{ label: 'Recently Added ↓', field: 'addedAt', direction: 'desc' },
@@ -68,19 +70,57 @@
 	$: type = $page.url.searchParams.get('type') || 'movie';
 
 	const filteredMedia = derived(
-		[searchQuery, sortFieldStore, sortDirectionStore],
-		([$searchQuery, $sortField, $sortDirection]) => {
-			// First filter the media
-			let result = !$searchQuery
-				? media
-				: media.filter((item) => {
-						const searchLower = $searchQuery.toLowerCase();
-						return (
-							item.title.toLowerCase().includes(searchLower) ||
-							(item.originalTitle || '').toLowerCase().includes(searchLower) ||
-							(type === 'show' && item.year?.toString().includes(searchLower))
-						);
-					});
+		[searchQuery, sortFieldStore, sortDirectionStore, qualityFilter, showMultiFileOnly],
+		([$searchQuery, $sortField, $sortDirection, $qualityFilter, $showMultiFileOnly]) => {
+			// Start with the original media list
+			let result = media;
+
+			// Apply search filter if there's a query
+			if ($searchQuery) {
+				result = result.filter((item) => {
+					const searchLower = $searchQuery.toLowerCase();
+					return (
+						item.title.toLowerCase().includes(searchLower) ||
+						(item.originalTitle || '').toLowerCase().includes(searchLower) ||
+						(type === 'show' && item.year?.toString().includes(searchLower))
+					);
+				});
+			}
+
+			// Apply quality filter if selected
+			if ($qualityFilter && type === 'movie') {
+				result = media.filter((item) => {
+					const mediaInfo = item.Media?.[0];
+					if (!mediaInfo) return false;
+
+					const size = mediaInfo.Part?.[0]?.size || 0;
+					const bitrate = mediaInfo.bitrate || 0;
+					const { sizePercentile, overallBitratePercentile } = getPercentiles(size, bitrate);
+					const avgPercentile = (sizePercentile + overallBitratePercentile) / 2;
+
+					switch ($qualityFilter) {
+						case '90p+':
+							return avgPercentile >= 90;
+						case '75-89p':
+							return avgPercentile >= 75 && avgPercentile < 90;
+						case '50-74p':
+							return avgPercentile >= 50 && avgPercentile < 75;
+						case '25-49p':
+							return avgPercentile >= 25 && avgPercentile < 50;
+						case '<25p':
+							return avgPercentile < 25;
+						default:
+							return true;
+					}
+				});
+			}
+
+			// Apply multi-file filter if selected
+			if ($showMultiFileOnly && type === 'movie') {
+				result = media.filter((item) => {
+					return item.Media && item.Media.length > 1;
+				});
+			}
 
 			// Then sort the filtered results
 			return [...result].sort((a, b) => {
@@ -446,6 +486,47 @@
 					</select>
 				{/if}
 			</div>
+
+			{#if type === 'movie'}
+				<div class="mb-4 flex flex-wrap gap-2">
+					<button
+						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+						on:click={() => qualityFilter.update((v) => (v === '90p+' ? null : '90p+'))}
+					>
+						<span class="text-green-500">★★★★</span>
+					</button>
+					<button
+						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+						on:click={() => qualityFilter.update((v) => (v === '75-89p' ? null : '75-89p'))}
+					>
+						<span class="text-green-500">●●●●</span>
+					</button>
+					<button
+						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+						on:click={() => qualityFilter.update((v) => (v === '50-74p' ? null : '50-74p'))}
+					>
+						<span class="text-teal-500">●●●○</span>
+					</button>
+					<button
+						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+						on:click={() => qualityFilter.update((v) => (v === '25-49p' ? null : '25-49p'))}
+					>
+						<span class="text-orange-500">●○○○</span>
+					</button>
+					<button
+						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+						on:click={() => qualityFilter.update((v) => (v === '<25p' ? null : '<25p'))}
+					>
+						<span class="text-red-500">●○○○</span>
+					</button>
+					<button
+						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+						on:click={() => showMultiFileOnly.update((v) => !v)}
+					>
+						Multiple Files
+					</button>
+				</div>
+			{/if}
 
 			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
 				<div class="overflow-x-auto">
