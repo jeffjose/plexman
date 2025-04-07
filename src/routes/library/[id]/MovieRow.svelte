@@ -8,7 +8,8 @@
 	export let formatFileSize: (bytes: number) => string;
 
 	let rowElement: HTMLElement;
-	let observer: IntersectionObserver;
+	let observer: IntersectionObserver | null = null;
+	let expanded = false;
 
 	function setupObserver() {
 		if (observer) {
@@ -20,7 +21,7 @@
 				entries.forEach((entry) => {
 					if (entry.isIntersecting && !detailedMedia.has(item.ratingKey)) {
 						onDebug(item);
-						observer.unobserve(entry.target);
+						observer?.unobserve(entry.target);
 					}
 				});
 			},
@@ -44,130 +45,80 @@
 	afterUpdate(() => {
 		setupObserver();
 	});
+
+	function getVideoCodec(mediaItem: any) {
+		const videoStream = mediaItem?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1);
+		return videoStream?.codec?.toUpperCase() || 'Unknown';
+	}
+
+	function getAudioCodec(mediaItem: any) {
+		const audioStream = mediaItem?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2);
+		return audioStream?.codec?.toUpperCase() || 'Unknown';
+	}
+
+	function getResolution(mediaItem: any) {
+		const videoStream = mediaItem?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1);
+		if (!videoStream) return '';
+		return `${videoStream.width}x${videoStream.height}`;
+	}
+
+	function getBitrate(mediaItem: any, streamType: number) {
+		const stream = mediaItem?.Part?.[0]?.Stream?.find((s: any) => s.streamType === streamType);
+		return stream?.bitrate || mediaItem?.bitrate || 0;
+	}
+
+	$: detailedItem = detailedMedia.get(item.ratingKey);
+	$: mediaVersions = detailedItem?.Media || item.Media || [];
+	$: hasMultipleVersions = mediaVersions.length > 1;
 </script>
 
-<tr class="hover:bg-gray-50" bind:this={rowElement}>
-	<td class="px-1 py-2">
-		<button
-			on:click={() => onDebug(item)}
-			class="text-gray-400 hover:text-gray-600 transition-colors"
-			title="Debug movie data"
-		>
-			<svg
-				xmlns="http://www.w3.org/2000/svg"
-				class="h-4 w-4"
-				viewBox="0 0 20 20"
-				fill="currentColor"
-			>
-				<path
-					fill-rule="evenodd"
-					d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-					clip-rule="evenodd"
-				/>
-			</svg>
-		</button>
+<tr
+	bind:this={rowElement}
+	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''}"
+>
+	<td class="px-1 py-1">
+		<img
+			src={`${localStorage.getItem('plexServerUrl')}${item.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
+			alt={item.title}
+			class="w-12 h-16 object-cover rounded"
+			loading="lazy"
+			decoding="async"
+		/>
 	</td>
-	<td class="px-3 py-2">
-		{#if item.thumb}
-			<img
-				src={`${localStorage.getItem('plexServerUrl')}${item.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
-				alt={item.title}
-				class="h-16 w-auto rounded shadow-sm"
-				loading="lazy"
-				decoding="async"
-			/>
+	<td class="px-2 py-1">
+		<div class="font-medium text-sm text-gray-900">{item.title}</div>
+		{#if item.originalTitle && item.originalTitle !== item.title}
+			<div class="text-xs text-gray-500">{item.originalTitle}</div>
 		{/if}
 	</td>
-	<td class="px-3 py-2">
-		<div>
-			<div class="text-sm font-medium text-gray-900 leading-tight">
-				{item.title}
-			</div>
-			{#if item.originalTitle && item.originalTitle !== item.title}
-				<div class="text-xs text-gray-500 leading-tight">{item.originalTitle}</div>
-			{/if}
+	<td class="px-2 py-1 text-xs text-gray-500">{item.year}</td>
+	<td class="px-2 py-1 text-xs text-gray-500">{formatDuration(item.duration)}</td>
+	<td class="px-2 py-1">
+		<div class="space-y-1">
+			{#each mediaVersions as mediaItem, i}
+				<div
+					class="flex items-center space-x-2 {i > 0 ? 'mt-1 pt-1 border-t border-gray-100' : ''}"
+				>
+					<div class="text-xs text-gray-500 w-14">
+						{formatFileSize(mediaItem?.Part?.[0]?.size || 0)}
+					</div>
+					<div class="flex space-x-1">
+						<span
+							class="px-1.5 py-0.5 text-xs font-medium rounded {getVideoCodec(mediaItem) === 'HEVC'
+								? 'bg-green-100 text-green-800'
+								: 'bg-blue-100 text-blue-800'}"
+						>
+							{getVideoCodec(mediaItem)}
+						</span>
+						<span class="px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-800 rounded">
+							{getResolution(mediaItem)}
+						</span>
+					</div>
+					<div class="text-xs text-gray-500 w-14">{getBitrate(mediaItem, 0)}k</div>
+					<div class="text-xs text-gray-500 w-14">{getBitrate(mediaItem, 1)}k</div>
+					<div class="text-xs text-gray-500 w-14">{getBitrate(mediaItem, 2)}k</div>
+				</div>
+			{/each}
 		</div>
-	</td>
-	<td class="px-3 py-2 text-xs text-gray-500">
-		{item.year || '-'}
-	</td>
-	<td class="px-3 py-2 text-xs text-gray-500">
-		{formatDuration(item.duration)}
-	</td>
-	<td class="px-3 py-2 text-xs text-gray-500">
-		{#if item.Media?.[0]?.Part?.[0]?.size}
-			{formatFileSize(item.Media[0].Part[0].size)}
-		{:else}
-			-
-		{/if}
-	</td>
-	<td class="px-3 py-2">
-		{#if item.Media?.[0]?.videoCodec}
-			{@const codec = item.Media[0].videoCodec.toLowerCase()}
-			<span
-				class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {codec === 'hevc'
-					? 'bg-green-100 text-green-800'
-					: codec === 'h264'
-						? 'bg-blue-100 text-blue-800'
-						: codec === 'mpeg4'
-							? 'bg-yellow-100 text-yellow-800'
-							: codec === 'mpeg2video'
-								? 'bg-red-100 text-red-800'
-								: 'bg-gray-100 text-gray-800'}"
-			>
-				{item.Media[0].videoCodec.toUpperCase()}
-			</span>
-		{:else}
-			-
-		{/if}
-	</td>
-	<td class="px-3 py-2 text-xs text-gray-500">
-		{#if item.Media?.[0]?.bitrate}
-			{item.Media[0].bitrate} Kbps
-		{:else}
-			-
-		{/if}
-	</td>
-	<td class="px-3 py-2 text-xs text-gray-500">
-		{#if detailedMedia.get(item.ratingKey)?.Media?.[0]?.Part?.[0]?.Stream}
-			{@const videoStream = detailedMedia
-				.get(item.ratingKey)
-				.Media[0].Part[0].Stream.find((s: any) => s.streamType === 1)}
-			{#if videoStream?.bitrate}
-				{videoStream.bitrate} Kbps
-			{:else}
-				-
-			{/if}
-		{:else if item.Media?.[0]?.Part?.[0]?.Stream}
-			{@const videoStream = item.Media[0].Part[0].Stream.find((s: any) => s.streamType === 1)}
-			{#if videoStream?.bitrate}
-				{videoStream.bitrate} Kbps
-			{:else}
-				-
-			{/if}
-		{:else}
-			-
-		{/if}
-	</td>
-	<td class="px-3 py-2 text-xs text-gray-500">
-		{#if detailedMedia.get(item.ratingKey)?.Media?.[0]?.Part?.[0]?.Stream}
-			{@const audioStream = detailedMedia
-				.get(item.ratingKey)
-				.Media[0].Part[0].Stream.find((s: any) => s.streamType === 2)}
-			{#if audioStream?.bitrate}
-				{audioStream.bitrate} Kbps
-			{:else}
-				-
-			{/if}
-		{:else if item.Media?.[0]?.Part?.[0]?.Stream}
-			{@const audioStream = item.Media[0].Part[0].Stream.find((s: any) => s.streamType === 2)}
-			{#if audioStream?.bitrate}
-				{audioStream.bitrate} Kbps
-			{:else}
-				-
-			{/if}
-		{:else}
-			-
-		{/if}
 	</td>
 </tr>

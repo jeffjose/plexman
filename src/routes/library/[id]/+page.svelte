@@ -3,22 +3,99 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import MovieRow from './MovieRow.svelte';
+	import { writable, derived } from 'svelte/store';
 
 	let media: any[] = [];
 	let loading = true;
 	let error: string | null = null;
 	let sortField = 'title';
 	let sortDirection = 'asc';
-	let searchQuery = '';
-	let detailedMedia = new Map<string, any>(); // Store detailed info by ratingKey
+
+	const searchQuery = writable('');
+	const sortFieldStore = writable(sortField);
+	const sortDirectionStore = writable(sortDirection);
+	let searchInput = '';
+	let searchTimeout: ReturnType<typeof setTimeout>;
+
+	function debounceSearch(value: string) {
+		clearTimeout(searchTimeout);
+		searchTimeout = setTimeout(() => {
+			searchQuery.set(value);
+		}, 250);
+	}
 
 	$: libraryId = $page.params.id;
 	$: type = $page.url.searchParams.get('type');
-	$: filteredMedia = media.filter(
-		(item) =>
-			item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			(item.originalTitle && item.originalTitle.toLowerCase().includes(searchQuery.toLowerCase()))
+
+	const filteredMedia = derived(
+		[searchQuery, sortFieldStore, sortDirectionStore],
+		([$searchQuery, $sortField, $sortDirection]) => {
+			// First filter the media
+			let result = !$searchQuery
+				? media
+				: media.filter(
+						(item) =>
+							item.title.toLowerCase().includes($searchQuery.toLowerCase()) ||
+							(item.originalTitle &&
+								item.originalTitle.toLowerCase().includes($searchQuery.toLowerCase()))
+					);
+
+			// Then sort the filtered results
+			return [...result].sort((a, b) => {
+				let aVal: any;
+				let bVal: any;
+
+				switch ($sortField) {
+					case 'overallBitrate':
+						aVal = a.Media?.[0]?.bitrate || 0;
+						bVal = b.Media?.[0]?.bitrate || 0;
+						break;
+					case 'videoBitrate': {
+						const aDetailed = detailedMedia.get(a.ratingKey);
+						const bDetailed = detailedMedia.get(b.ratingKey);
+						aVal =
+							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
+								?.bitrate ||
+							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
+							0;
+						bVal =
+							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
+								?.bitrate ||
+							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
+							0;
+						break;
+					}
+					case 'audioBitrate': {
+						const aDetailed = detailedMedia.get(a.ratingKey);
+						const bDetailed = detailedMedia.get(b.ratingKey);
+						aVal =
+							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)
+								?.bitrate ||
+							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)?.bitrate ||
+							0;
+						bVal =
+							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)
+								?.bitrate ||
+							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2)?.bitrate ||
+							0;
+						break;
+					}
+					default:
+						aVal = a[$sortField] || '';
+						bVal = b[$sortField] || '';
+				}
+
+				if (typeof aVal === 'number' && typeof bVal === 'number') {
+					return $sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+				}
+				return $sortDirection === 'asc'
+					? aVal.toString().localeCompare(bVal.toString())
+					: bVal.toString().localeCompare(aVal.toString());
+			});
+		}
 	);
+
+	let detailedMedia = new Map<string, any>(); // Store detailed info by ratingKey
 
 	async function fetchMedia() {
 		const token = localStorage.getItem('plexToken');
@@ -80,18 +157,13 @@
 	function handleSort(field: string) {
 		if (sortField === field) {
 			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+			sortDirectionStore.set(sortDirection);
 		} else {
 			sortField = field;
+			sortFieldStore.set(field);
 			sortDirection = 'asc';
+			sortDirectionStore.set('asc');
 		}
-
-		media = [...media].sort((a, b) => {
-			const aVal = a[field] || '';
-			const bVal = b[field] || '';
-			return sortDirection === 'asc'
-				? aVal.toString().localeCompare(bVal.toString())
-				: bVal.toString().localeCompare(aVal.toString());
-		});
 	}
 
 	function formatDuration(ms: number): string {
@@ -228,13 +300,17 @@
 				<div class="relative">
 					<input
 						type="text"
-						bind:value={searchQuery}
+						bind:value={searchInput}
+						on:input={() => debounceSearch(searchInput)}
 						placeholder="Search movies..."
 						class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
 					/>
-					{#if searchQuery}
+					{#if searchInput}
 						<button
-							on:click={() => (searchQuery = '')}
+							on:click={() => {
+								searchInput = '';
+								searchQuery.set('');
+							}}
 							class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
 						>
 							<svg
@@ -255,67 +331,64 @@
 			</div>
 			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
 				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200 text-sm">
+					<table class="min-w-full divide-y divide-gray-200">
 						<thead class="bg-gray-50">
 							<tr>
-								<th class="w-8 px-1 py-2"></th>
+								<th class="px-1 py-1 w-12"></th>
 								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32"
-								>
-									Poster
-								</th>
-								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-									on:click={() => handleSort('title')}
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>
 									Title
-									{#if sortField === 'title'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
 								</th>
 								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 w-16"
-									on:click={() => handleSort('year')}
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
 								>
 									Year
-									{#if sortField === 'year'}
-										<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-									{/if}
 								</th>
 								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
 								>
-									Runtime
+									Duration
 								</th>
 								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>
-									Size
-								</th>
-								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
-								>
-									Format
-								</th>
-								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Overall
-								</th>
-								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Video
-								</th>
-								<th
-									class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Audio
+									<div class="flex items-center space-x-2">
+										<div class="w-14">Size</div>
+										<div class="w-24">Format</div>
+										<div
+											class="w-14 cursor-pointer hover:bg-gray-100"
+											on:click={() => handleSort('overallBitrate')}
+										>
+											Overall
+											{#if sortField === 'overallBitrate'}
+												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+											{/if}
+										</div>
+										<div
+											class="w-14 cursor-pointer hover:bg-gray-100"
+											on:click={() => handleSort('videoBitrate')}
+										>
+											Video
+											{#if sortField === 'videoBitrate'}
+												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+											{/if}
+										</div>
+										<div
+											class="w-14 cursor-pointer hover:bg-gray-100"
+											on:click={() => handleSort('audioBitrate')}
+										>
+											Audio
+											{#if sortField === 'audioBitrate'}
+												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+											{/if}
+										</div>
+									</div>
 								</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-200">
-							{#each filteredMedia as item}
+							{#each $filteredMedia as item (item.ratingKey)}
 								<MovieRow
 									{item}
 									{detailedMedia}
