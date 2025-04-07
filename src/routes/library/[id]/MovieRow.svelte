@@ -78,7 +78,7 @@
 		if (percentile < 25) return 'text-red-500';
 		if (percentile < 50) return 'text-orange-500';
 		if (percentile > 75) return 'text-green-500';
-		return 'text-gray-400';
+		return 'text-teal-500';
 	}
 
 	$: detailedItem = detailedMedia.get(item.ratingKey);
@@ -100,10 +100,56 @@
 		/>
 	</td>
 	<td class="px-2 py-1">
-		<div class="font-medium text-sm text-gray-900">{item.title}</div>
-		{#if item.originalTitle && item.originalTitle !== item.title}
-			<div class="text-xs text-gray-500">{item.originalTitle}</div>
-		{/if}
+		<div class="flex items-center space-x-2">
+			{#if item.Media?.[0]?.bitrate}
+				{@const percentiles = getPercentiles(
+					item.Media[0].Part?.[0]?.size || 0,
+					item.Media[0].bitrate
+				)}
+				<div class="flex space-x-0.5" title="{percentiles.overallBitratePercentile}th percentile">
+					<div
+						class="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-opacity-30 {percentiles.overallBitratePercentile >=
+						75
+							? 'bg-green-500 ring-green-200'
+							: percentiles.overallBitratePercentile >= 50
+								? 'bg-teal-500 ring-teal-200'
+								: percentiles.overallBitratePercentile >= 25
+									? 'bg-orange-500 ring-orange-200'
+									: 'bg-red-500 ring-red-200'}"
+					></div>
+					<div
+						class="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-opacity-30 {percentiles.overallBitratePercentile >=
+						75
+							? 'bg-green-500 ring-green-200'
+							: percentiles.overallBitratePercentile >= 50
+								? 'bg-teal-500 ring-teal-200'
+								: percentiles.overallBitratePercentile >= 25
+									? 'bg-orange-500 ring-orange-200'
+									: 'bg-gray-200 ring-gray-100'}"
+					></div>
+					<div
+						class="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-opacity-30 {percentiles.overallBitratePercentile >=
+						75
+							? 'bg-green-500 ring-green-200'
+							: percentiles.overallBitratePercentile >= 50
+								? 'bg-teal-500 ring-teal-200'
+								: 'bg-gray-200 ring-gray-100'}"
+					></div>
+					<div
+						class="w-2 h-2 rounded-full flex-shrink-0 ring-1 ring-opacity-30 {percentiles.overallBitratePercentile >=
+						75
+							? 'bg-green-500 ring-green-200'
+							: 'bg-gray-200 ring-gray-100'}"
+					></div>
+				</div>
+			{/if}
+			<div>
+				<div class="font-medium text-sm text-gray-900">{item.title}</div>
+				{#if item.originalTitle && item.originalTitle !== item.title}
+					<div class="text-xs text-gray-500">{item.originalTitle}</div>
+				{/if}
+			</div>
+		</div>
 	</td>
 	<td class="px-2 py-1 text-xs text-gray-500">{item.year}</td>
 	<td class="px-2 py-1 text-xs text-gray-500">{formatDuration(item.duration)}</td>

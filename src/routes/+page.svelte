@@ -3,8 +3,44 @@
 	import { goto } from '$app/navigation';
 
 	let libraries: any[] = [];
+	let sessions: any[] = [];
 	let loading = true;
 	let error: string | null = null;
+
+	async function fetchSessions() {
+		const token = localStorage.getItem('plexToken');
+		const clientId = localStorage.getItem('plexClientId');
+		const serverUrl = localStorage.getItem('plexServerUrl');
+
+		if (!token || !clientId || !serverUrl) {
+			goto('/login');
+			return;
+		}
+
+		const headers = {
+			Accept: 'application/json',
+			'X-Plex-Token': token,
+			'X-Plex-Client-Identifier': clientId,
+			'X-Plex-Product': 'Plexman',
+			'X-Plex-Version': '1.0.0',
+			'X-Plex-Platform': 'Web',
+			'X-Plex-Platform-Version': '1.0.0',
+			'X-Plex-Device': 'Browser',
+			'X-Plex-Device-Name': 'Plexman Web'
+		};
+
+		try {
+			const response = await fetch(`${serverUrl}/status/sessions`, { headers });
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch sessions');
+			}
+			const data = await response.json();
+			sessions = data.MediaContainer.Metadata || [];
+		} catch (e) {
+			console.error('Failed to fetch sessions:', e);
+		}
+	}
 
 	async function fetchLibraries() {
 		const token = localStorage.getItem('plexToken');
@@ -76,7 +112,13 @@
 		goto('/login');
 	}
 
-	onMount(fetchLibraries);
+	onMount(() => {
+		fetchLibraries();
+		fetchSessions();
+		// Set up polling for sessions every 10 seconds
+		const interval = setInterval(fetchSessions, 10000);
+		return () => clearInterval(interval);
+	});
 </script>
 
 <div class="min-h-screen bg-gray-100">
@@ -124,6 +166,56 @@
 				</div>
 			</div>
 		{:else}
+			{#if sessions.length > 0}
+				<div class="mb-8">
+					<h2 class="text-lg font-medium text-gray-900 mb-4">Current Sessions</h2>
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+						{#each sessions as session}
+							<div class="bg-white overflow-hidden shadow rounded-lg">
+								<div class="p-4">
+									<div class="flex space-x-3">
+										<img
+											src={`${localStorage.getItem('plexServerUrl')}${session.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
+											alt={session.title}
+											class="w-16 h-24 object-cover rounded"
+										/>
+										<div class="min-w-0">
+											<h3 class="text-sm font-medium text-gray-900 truncate">
+												{session.title}
+											</h3>
+											{#if session.type === 'episode'}
+												<p class="text-xs text-gray-500">
+													{session.grandparentTitle} - S{session.parentIndex}E{session.index}
+												</p>
+											{/if}
+											<div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
+												<span class="font-medium text-orange-600">{session.User.title}</span>
+												<span>•</span>
+												<span>{session.Player.title}</span>
+												<span>•</span>
+												<span>{session.Player.state}</span>
+												{#if session.Player.state !== 'paused'}
+													<span>•</span>
+													<span>{Math.round((session.viewOffset / session.duration) * 100)}%</span>
+												{/if}
+											</div>
+											<div class="mt-1">
+												<div class="bg-gray-200 rounded-full h-1">
+													<div
+														class="bg-orange-500 h-1 rounded-full"
+														style="width: {(session.viewOffset / session.duration) * 100}%"
+													></div>
+												</div>
+											</div>
+										</div>
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{#each libraries as library}
 					<a

@@ -97,6 +97,10 @@
 						aVal = a.originallyAvailableAt || '';
 						bVal = b.originallyAvailableAt || '';
 						break;
+					case 'year':
+						aVal = a.year || 0;
+						bVal = b.year || 0;
+						break;
 					default:
 						aVal = a[$sortField] || '';
 						bVal = b[$sortField] || '';
@@ -407,7 +411,17 @@
 									<th
 										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
 									>
-										Year
+										<button
+											type="button"
+											class="w-full text-left hover:bg-gray-100"
+											on:click={() => handleSort('year')}
+											on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
+										>
+											Year
+											{#if sortField === 'year'}
+												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+											{/if}
+										</button>
 									</th>
 									<th
 										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
