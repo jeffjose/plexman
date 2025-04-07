@@ -11,6 +11,7 @@
 	let error: string | null = null;
 	let sortField = 'originallyAvailableAt';
 	let sortDirection = 'asc';
+	let observers = new Map();
 
 	const searchQuery = writable('');
 	const sortFieldStore = writable(sortField);
@@ -87,6 +88,30 @@
 	);
 
 	let detailedMedia = new Map<string, any>();
+
+	function createObserver(episode: any) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						debugEpisode(episode);
+						observer.disconnect();
+						observers.delete(episode.ratingKey);
+					}
+				});
+			},
+			{ threshold: 0.1 }
+		);
+		return observer;
+	}
+
+	function observeEpisode(element: HTMLElement, episode: any) {
+		if (!observers.has(episode.ratingKey)) {
+			const observer = createObserver(episode);
+			observers.set(episode.ratingKey, observer);
+			observer.observe(element);
+		}
+	}
 
 	async function fetchShow() {
 		const token = localStorage.getItem('plexToken');
@@ -250,7 +275,14 @@
 		}
 	}
 
-	onMount(fetchShow);
+	onMount(() => {
+		fetchShow();
+		return () => {
+			// Cleanup observers on component unmount
+			observers.forEach((observer) => observer.disconnect());
+			observers.clear();
+		};
+	});
 </script>
 
 <div class="min-h-screen bg-gray-100">
@@ -419,7 +451,7 @@
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-100">
 							{#each $filteredEpisodes as episode (episode.ratingKey)}
-								<tr class="hover:bg-gray-50">
+								<tr class="hover:bg-gray-50" use:observeEpisode={episode}>
 									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
 										S{episode.parentIndex.toString().padStart(2, '0')}E{episode.index
 											.toString()
@@ -428,19 +460,6 @@
 									<td class="px-2 py-1 text-xs">
 										<div class="flex items-center">
 											<span class="font-medium text-gray-900">{episode.title}</span>
-											<button
-												type="button"
-												class="ml-2 text-gray-400 hover:text-gray-600"
-												on:click={() => debugEpisode(episode)}
-											>
-												<svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-													<path
-														fill-rule="evenodd"
-														d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-														clip-rule="evenodd"
-													/>
-												</svg>
-											</button>
 										</div>
 									</td>
 									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
