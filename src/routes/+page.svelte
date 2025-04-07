@@ -37,6 +37,31 @@
 			}
 			const data = await response.json();
 			sessions = data.MediaContainer.Metadata || [];
+
+			// Debug logging
+			sessions.forEach((session, index) => {
+				console.log(`\nSession ${index + 1}: ${session.title}`);
+				if (session.Media?.[0]) {
+					const media = session.Media[0];
+					const videoStream = media.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1);
+					const audioStream = media.Part?.[0]?.Stream?.find((s: any) => s.streamType === 2);
+					console.log('Media:', {
+						size: media.Part?.[0]?.size,
+						videoCodec: videoStream?.codec,
+						fileBitrate: media.bitrate,
+						videoBitrate: videoStream?.bitrate,
+						audioBitrate: audioStream?.bitrate,
+						videoProfile: videoStream?.profile,
+						videoLevel: videoStream?.level,
+						resolution: `${videoStream?.width}x${videoStream?.height}`,
+						fullVideoStream: videoStream,
+						fullAudioStream: audioStream,
+						fullMediaPart: media.Part?.[0]
+					});
+				} else {
+					console.log('No media information available');
+				}
+			});
 		} catch (e) {
 			console.error('Failed to fetch sessions:', e);
 		}
@@ -110,6 +135,21 @@
 		localStorage.removeItem('plexToken');
 		localStorage.removeItem('plexClientId');
 		goto('/login');
+	}
+
+	function formatFileSize(bytes: number): string {
+		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+		let size = bytes;
+		let unitIndex = 0;
+		while (size >= 1024 && unitIndex < units.length - 1) {
+			size /= 1024;
+			unitIndex++;
+		}
+		return `${size.toFixed(2)} ${units[unitIndex]}`;
+	}
+
+	function formatBitrate(bitrate: number): string {
+		return `${bitrate} Kbps`;
 	}
 
 	onMount(() => {
@@ -202,11 +242,68 @@
 											<div class="mt-1">
 												<div class="bg-gray-200 rounded-full h-1">
 													<div
-														class="bg-orange-500 h-1 rounded-full"
+														class="h-1 rounded-full {session.Media?.[0]?.Part?.[0]?.decision ===
+														'directplay'
+															? 'bg-green-500'
+															: 'bg-orange-500'}"
 														style="width: {(session.viewOffset / session.duration) * 100}%"
 													></div>
 												</div>
 											</div>
+											{#if session.Media?.[0]}
+												{@const media = session.Media[0]}
+												{@const videoStream = media.Part?.[0]?.Stream?.find(
+													(s: any) => s.streamType === 1
+												)}
+												{@const audioStream = media.Part?.[0]?.Stream?.find(
+													(s: any) => s.streamType === 2
+												)}
+												<div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+													{#if media.Part?.[0]?.decision === 'directplay'}
+														<span
+															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+														>
+															<span>{formatFileSize(media.Part?.[0]?.size || 0)}</span>
+														</span>
+														<span
+															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+														>
+															<span class="uppercase">{videoStream?.codec || '—'}</span>
+														</span>
+														<span
+															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+														>
+															<span
+																>{formatBitrate(media.bitrate || 0)} / {formatBitrate(
+																	videoStream?.bitrate || 0
+																)}</span
+															>
+														</span>
+													{:else}
+														{#if videoStream}
+															<span
+																class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+															>
+																<span
+																	>{videoStream.displayTitle} → {videoStream.codec.toUpperCase()}
+																	{videoStream.width}x{videoStream.height}</span
+																>
+															</span>
+														{/if}
+														{#if audioStream}
+															<span
+																class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+															>
+																<span
+																	>Audio: {audioStream.displayTitle} → {audioStream.channels}ch {formatBitrate(
+																		audioStream.bitrate || 0
+																	)}</span
+																>
+															</span>
+														{/if}
+													{/if}
+												</div>
+											{/if}
 										</div>
 									</div>
 								</div>
