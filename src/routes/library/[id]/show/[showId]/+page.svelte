@@ -293,29 +293,29 @@
 				</div>
 			</div>
 		{:else}
-			<div class="mb-8">
-				<div class="flex space-x-6">
+			<div class="mb-2">
+				<div class="flex space-x-3">
 					<img
 						src={`${localStorage.getItem('plexServerUrl')}${show.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
 						alt={show.title}
-						class="w-48 h-72 object-cover rounded-lg shadow-lg"
+						class="w-24 h-36 object-cover rounded"
 					/>
-					<div>
-						<h1 class="text-3xl font-bold text-gray-900">{show.title}</h1>
+					<div class="min-w-0">
+						<h1 class="text-lg font-medium text-gray-900 truncate">{show.title}</h1>
 						{#if show.originalTitle && show.originalTitle !== show.title}
-							<p class="text-xl text-gray-600">{show.originalTitle}</p>
+							<p class="text-sm text-gray-600 truncate">{show.originalTitle}</p>
 						{/if}
-						<div class="mt-2 flex items-center text-sm text-gray-500">
+						<div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
 							<span>{show.year}</span>
-							<span class="mx-2">•</span>
+							<span>•</span>
 							<span>{show.childCount} {show.childCount === 1 ? 'Season' : 'Seasons'}</span>
 							{#if show.leafCount}
-								<span class="mx-2">•</span>
+								<span>•</span>
 								<span>{show.leafCount} {show.leafCount === 1 ? 'Episode' : 'Episodes'}</span>
 							{/if}
 						</div>
 						{#if show.summary}
-							<p class="mt-4 text-gray-600">{show.summary}</p>
+							<p class="mt-1 text-xs text-gray-600 line-clamp-2">{show.summary}</p>
 						{/if}
 					</div>
 				</div>
