@@ -165,8 +165,47 @@
 	<nav class="bg-white shadow-sm">
 		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 			<div class="flex justify-between h-16">
-				<div class="flex items-center">
+				<div class="flex items-center space-x-8">
 					<h1 class="text-2xl font-bold text-gray-900">Plexman</h1>
+					<div class="flex items-center space-x-4">
+						{#each libraries as library}
+							<a
+								href="/library/{library.key}?type={library.type}"
+								class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100 text-gray-700"
+							>
+								<svg
+									class="h-5 w-5 mr-2 text-orange-600"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+								>
+									{#if library.type === 'movie'}
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
+										/>
+									{:else if library.type === 'show'}
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+										/>
+									{:else}
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+										/>
+									{/if}
+								</svg>
+								{library.title}
+							</a>
+						{/each}
+					</div>
 				</div>
 				<div class="flex items-center">
 					<button
@@ -205,165 +244,110 @@
 					</div>
 				</div>
 			</div>
-		{:else}
-			{#if sessions.length > 0}
-				<div class="mb-8">
-					<h2 class="text-lg font-medium text-gray-900 mb-4">Current Sessions</h2>
-					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-						{#each sessions as session}
-							<div class="bg-white overflow-hidden shadow rounded-lg">
-								<div class="p-4">
-									<div class="flex space-x-3">
-										<img
-											src={`${localStorage.getItem('plexServerUrl')}${session.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
-											alt={session.title}
-											class="w-16 h-24 object-cover rounded"
-										/>
-										<div class="min-w-0">
-											<h3 class="text-sm font-medium text-gray-900 truncate">
-												{session.title}
-											</h3>
-											{#if session.type === 'episode'}
-												<p class="text-xs text-gray-500">
-													{session.grandparentTitle} - S{session.parentIndex}E{session.index}
-												</p>
+		{:else if sessions.length > 0}
+			<div class="mb-8">
+				<h2 class="text-lg font-medium text-gray-900 mb-4">Current Sessions</h2>
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+					{#each sessions as session}
+						<div class="bg-white overflow-hidden shadow rounded-lg">
+							<div class="p-4">
+								<div class="flex space-x-3">
+									<img
+										src={`${localStorage.getItem('plexServerUrl')}${session.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
+										alt={session.title}
+										class="w-16 h-24 object-cover rounded"
+									/>
+									<div class="min-w-0">
+										<h3 class="text-sm font-medium text-gray-900 truncate">
+											{session.title}
+										</h3>
+										{#if session.type === 'episode'}
+											<p class="text-xs text-gray-500">
+												{session.grandparentTitle} - S{session.parentIndex}E{session.index}
+											</p>
+										{/if}
+										<div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
+											<span class="font-medium text-orange-600">{session.User.title}</span>
+											<span>•</span>
+											<span>{session.Player.title}</span>
+											<span>•</span>
+											<span>{session.Player.state}</span>
+											{#if session.Player.state !== 'paused'}
+												<span>•</span>
+												<span>{Math.round((session.viewOffset / session.duration) * 100)}%</span>
 											{/if}
-											<div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
-												<span class="font-medium text-orange-600">{session.User.title}</span>
-												<span>•</span>
-												<span>{session.Player.title}</span>
-												<span>•</span>
-												<span>{session.Player.state}</span>
-												{#if session.Player.state !== 'paused'}
-													<span>•</span>
-													<span>{Math.round((session.viewOffset / session.duration) * 100)}%</span>
-												{/if}
+										</div>
+										<div class="mt-1">
+											<div class="bg-gray-200 rounded-full h-1">
+												<div
+													class="h-1 rounded-full {session.Media?.[0]?.Part?.[0]?.decision ===
+													'directplay'
+														? 'bg-green-500'
+														: 'bg-orange-500'}"
+													style="width: {(session.viewOffset / session.duration) * 100}%"
+												></div>
 											</div>
-											<div class="mt-1">
-												<div class="bg-gray-200 rounded-full h-1">
-													<div
-														class="h-1 rounded-full {session.Media?.[0]?.Part?.[0]?.decision ===
-														'directplay'
-															? 'bg-green-500'
-															: 'bg-orange-500'}"
-														style="width: {(session.viewOffset / session.duration) * 100}%"
-													></div>
-												</div>
-											</div>
-											{#if session.Media?.[0]}
-												{@const media = session.Media[0]}
-												{@const videoStream = media.Part?.[0]?.Stream?.find(
-													(s: any) => s.streamType === 1
-												)}
-												{@const audioStream = media.Part?.[0]?.Stream?.find(
-													(s: any) => s.streamType === 2
-												)}
-												<div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
-													{#if media.Part?.[0]?.decision === 'directplay'}
+										</div>
+										{#if session.Media?.[0]}
+											{@const media = session.Media[0]}
+											{@const videoStream = media.Part?.[0]?.Stream?.find(
+												(s: any) => s.streamType === 1
+											)}
+											{@const audioStream = media.Part?.[0]?.Stream?.find(
+												(s: any) => s.streamType === 2
+											)}
+											<div class="mt-2 flex flex-wrap gap-2 text-xs text-gray-500">
+												{#if media.Part?.[0]?.decision === 'directplay'}
+													<span
+														class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+													>
+														<span>{formatFileSize(media.Part?.[0]?.size || 0)}</span>
+													</span>
+													<span
+														class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+													>
+														<span class="uppercase">{videoStream?.codec || '—'}</span>
+													</span>
+													<span
+														class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+													>
 														<span
-															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+															>{formatBitrate(media.bitrate || 0)} / {formatBitrate(
+																videoStream?.bitrate || 0
+															)}</span
 														>
-															<span>{formatFileSize(media.Part?.[0]?.size || 0)}</span>
-														</span>
-														<span
-															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
-														>
-															<span class="uppercase">{videoStream?.codec || '—'}</span>
-														</span>
+													</span>
+												{:else}
+													{#if videoStream}
 														<span
 															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
 														>
 															<span
-																>{formatBitrate(media.bitrate || 0)} / {formatBitrate(
-																	videoStream?.bitrate || 0
+																>{videoStream.displayTitle} → {videoStream.codec.toUpperCase()}
+																{videoStream.width}x{videoStream.height}</span
+															>
+														</span>
+													{/if}
+													{#if audioStream}
+														<span
+															class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
+														>
+															<span
+																>Audio: {audioStream.displayTitle} → {audioStream.channels}ch {formatBitrate(
+																	audioStream.bitrate || 0
 																)}</span
 															>
 														</span>
-													{:else}
-														{#if videoStream}
-															<span
-																class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
-															>
-																<span
-																	>{videoStream.displayTitle} → {videoStream.codec.toUpperCase()}
-																	{videoStream.width}x{videoStream.height}</span
-																>
-															</span>
-														{/if}
-														{#if audioStream}
-															<span
-																class="inline-flex items-center space-x-1 bg-gray-100 px-2 py-1 rounded"
-															>
-																<span
-																	>Audio: {audioStream.displayTitle} → {audioStream.channels}ch {formatBitrate(
-																		audioStream.bitrate || 0
-																	)}</span
-																>
-															</span>
-														{/if}
 													{/if}
-												</div>
-											{/if}
-										</div>
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
-			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-				{#each libraries as library}
-					<a
-						href="/library/{library.key}?type={library.type}"
-						class="block bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-200"
-					>
-						<div class="px-4 py-5 sm:p-6">
-							<div class="flex items-center">
-								<div class="flex-shrink-0 bg-orange-100 rounded-md p-3">
-									<svg
-										class="h-6 w-6 text-orange-600"
-										fill="none"
-										viewBox="0 0 24 24"
-										stroke="currentColor"
-									>
-										{#if library.type === 'movie'}
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"
-											/>
-										{:else if library.type === 'show'}
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-											/>
-										{:else}
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-											/>
+												{/if}
+											</div>
 										{/if}
-									</svg>
-								</div>
-								<div class="ml-5">
-									<h3 class="text-lg font-medium text-gray-900">
-										{library.title}
-									</h3>
-									<div class="mt-1 text-sm text-gray-500">
-										{library.type.charAt(0).toUpperCase() + library.type.slice(1)}
 									</div>
 								</div>
 							</div>
 						</div>
-					</a>
-				{/each}
+					{/each}
+				</div>
 			</div>
 		{/if}
 	</main>
