@@ -6,6 +6,13 @@
 	export let onDebug: (movie: any) => Promise<void>;
 	export let formatDuration: (ms: number) => string;
 	export let formatFileSize: (bytes: number) => string;
+	export let getPercentiles: (
+		size: number,
+		overallBitrate: number
+	) => {
+		sizePercentile: number;
+		overallBitratePercentile: number;
+	};
 
 	let rowElement: HTMLElement;
 	let observer: IntersectionObserver | null = null;
@@ -67,6 +74,13 @@
 		return stream?.bitrate || mediaItem?.bitrate || 0;
 	}
 
+	function getPercentileColor(percentile: number): string {
+		if (percentile < 25) return 'text-red-500';
+		if (percentile < 50) return 'text-orange-500';
+		if (percentile > 75) return 'text-green-500';
+		return 'text-gray-400';
+	}
+
 	$: detailedItem = detailedMedia.get(item.ratingKey);
 	$: mediaVersions = detailedItem?.Media || item.Media || [];
 	$: hasMultipleVersions = mediaVersions.length > 1;
@@ -96,11 +110,16 @@
 	<td class="px-2 py-1">
 		<div class="space-y-1">
 			{#each mediaVersions as mediaItem, i}
+				{@const size = mediaItem?.Part?.[0]?.size || 0}
+				{@const overallBitrate = getBitrate(mediaItem, 0)}
+				{@const videoBitrate = getBitrate(mediaItem, 1)}
+				{@const percentiles = getPercentiles(size, overallBitrate)}
 				<div
 					class="flex items-center space-x-2 {i > 0 ? 'mt-1 pt-1 border-t border-gray-100' : ''}"
 				>
-					<div class="text-xs text-gray-500 w-14">
-						{formatFileSize(mediaItem?.Part?.[0]?.size || 0)}
+					<div class="text-xs w-14 {getPercentileColor(percentiles.sizePercentile)}">
+						{formatFileSize(size)}
+						<span class="opacity-75">({percentiles.sizePercentile}p)</span>
 					</div>
 					<div class="flex space-x-1">
 						<span
@@ -114,8 +133,13 @@
 							{getResolution(mediaItem)}
 						</span>
 					</div>
-					<div class="text-xs text-gray-500 w-14">{getBitrate(mediaItem, 0)}k</div>
-					<div class="text-xs text-gray-500 w-14">{getBitrate(mediaItem, 1)}k</div>
+					<div class="text-xs w-14 {getPercentileColor(percentiles.overallBitratePercentile)}">
+						{overallBitrate}k
+						<span class="opacity-75">({percentiles.overallBitratePercentile}p)</span>
+					</div>
+					<div class="text-xs text-gray-500 w-14">
+						{videoBitrate}k
+					</div>
 					<div class="text-xs text-gray-500 w-14">{getBitrate(mediaItem, 2)}k</div>
 				</div>
 			{/each}

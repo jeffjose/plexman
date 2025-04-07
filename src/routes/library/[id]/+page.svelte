@@ -184,6 +184,42 @@
 		return `${size.toFixed(2)} ${units[unitIndex]}`;
 	}
 
+	function calculatePercentile(value: number, allValues: number[]): number {
+		if (allValues.length === 0) return 0;
+		const sorted = [...allValues].sort((a, b) => a - b);
+		const index = sorted.indexOf(value);
+		return Math.round((index / (sorted.length - 1)) * 100);
+	}
+
+	// Calculate all sizes and bitrates for percentiles
+	$: allSizes = media
+		.flatMap((item) => item.Media?.map((m) => m?.Part?.[0]?.size || 0) || [])
+		.filter((size) => size > 0);
+	$: allOverallBitrates = media
+		.flatMap((item) => item.Media?.map((m) => m?.bitrate || 0) || [])
+		.filter((br) => br > 0);
+	$: allVideoBitrates = media
+		.flatMap(
+			(item) =>
+				item.Media?.map((m) => {
+					const detailed = detailedMedia.get(item.ratingKey);
+					return (
+						detailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
+							?.bitrate ||
+						m?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
+						0
+					);
+				}) || []
+		)
+		.filter((br) => br > 0);
+
+	function getPercentiles(size: number, overallBitrate: number) {
+		return {
+			sizePercentile: calculatePercentile(size, allSizes),
+			overallBitratePercentile: calculatePercentile(overallBitrate, allOverallBitrates)
+		};
+	}
+
 	function formatBitrate(bitrate: number): string {
 		const item = media.find((m) => m.Media?.[0]?.bitrate === bitrate);
 		if (!item) return `${bitrate} Kbps`;
@@ -395,6 +431,7 @@
 									onDebug={debugMovie}
 									{formatDuration}
 									{formatFileSize}
+									{getPercentiles}
 								/>
 							{/each}
 						</tbody>
