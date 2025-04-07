@@ -465,7 +465,7 @@
 							class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 p-2"
 						>
 							{#each $filteredMedia as show (show.ratingKey)}
-								<ShowRow {show} />
+								<ShowRow {show} {libraryId} />
 							{/each}
 						</div>
 					{/if}

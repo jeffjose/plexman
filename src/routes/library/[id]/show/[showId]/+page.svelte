@@ -255,13 +255,13 @@
 
 <div class="min-h-screen bg-gray-100">
 	<nav class="bg-white shadow-sm">
-		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-			<div class="flex justify-between h-16">
-				<div class="flex items-center space-x-8">
-					<a href="/" class="text-2xl font-bold text-gray-900">Plexman</a>
-					<a href="/library/{libraryId}?type=show" class="text-gray-500 hover:text-gray-700"
-						>← Back to Shows</a
-					>
+		<div class="max-w-7xl mx-auto px-4">
+			<div class="flex justify-between h-12">
+				<div class="flex items-center space-x-4">
+					<a href="/" class="text-lg font-bold text-gray-900">Plexman</a>
+					<a href="/library/{libraryId}?type=show" class="text-gray-500 hover:text-gray-700">
+						← Back to Shows
+					</a>
 				</div>
 			</div>
 		</div>
@@ -360,61 +360,128 @@
 					<table class="min-w-full divide-y divide-gray-200">
 						<thead class="bg-gray-50">
 							<tr>
-								<th class="px-1 py-1 w-12"></th>
 								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
 								>
 									Episode
 								</th>
 								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>
-									Air Date
+									Title
 								</th>
 								<th
 									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
 								>
-									Duration
+									Runtime
 								</th>
 								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
 								>
-									<div class="flex items-center space-x-2">
-										<div class="w-14">Size</div>
-										<div class="w-24">Format</div>
-										<div
-											class="w-14 cursor-pointer hover:bg-gray-100"
-											on:click={() => handleSort('overallBitrate')}
-										>
-											Overall
-											{#if sortField === 'overallBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</div>
-										<div
-											class="w-14 cursor-pointer hover:bg-gray-100"
-											on:click={() => handleSort('videoBitrate')}
-										>
-											Video
-											{#if sortField === 'videoBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</div>
-										<div class="w-14">Audio</div>
-									</div>
+									Codec
+								</th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>
+									<button
+										type="button"
+										class="w-full text-left hover:bg-gray-100"
+										on:click={() => handleSort('overallBitrate')}
+										on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
+									>
+										Overall
+										{#if sortField === 'overallBitrate'}
+											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+										{/if}
+									</button>
+								</th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>
+									<button
+										type="button"
+										class="w-full text-left hover:bg-gray-100"
+										on:click={() => handleSort('videoBitrate')}
+										on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
+									>
+										Video
+										{#if sortField === 'videoBitrate'}
+											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+										{/if}
+									</button>
+								</th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>
+									Audio
 								</th>
 							</tr>
 						</thead>
-						<tbody class="bg-white divide-y divide-gray-200">
-							{#each $filteredEpisodes as item (item.ratingKey)}
-								<MovieRow
-									{item}
-									{detailedMedia}
-									onDebug={debugEpisode}
-									{formatDuration}
-									{formatFileSize}
-									{getPercentiles}
-								/>
+						<tbody class="bg-white divide-y divide-gray-100">
+							{#each $filteredEpisodes as episode (episode.ratingKey)}
+								<tr class="hover:bg-gray-50">
+									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+										S{episode.parentIndex.toString().padStart(2, '0')}E{episode.index
+											.toString()
+											.padStart(2, '0')}
+									</td>
+									<td class="px-2 py-1 text-xs">
+										<div class="flex items-center">
+											<span class="font-medium text-gray-900">{episode.title}</span>
+											<button
+												type="button"
+												class="ml-2 text-gray-400 hover:text-gray-600"
+												on:click={() => debugEpisode(episode)}
+											>
+												<svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+													<path
+														fill-rule="evenodd"
+														d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+														clip-rule="evenodd"
+													/>
+												</svg>
+											</button>
+										</div>
+									</td>
+									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+										{formatDuration(episode.duration)}
+									</td>
+									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
+											{@const videoStream = episode.Media[0].Part[0].Stream.find(
+												(s: any) => s.streamType === 1
+											)}
+											{videoStream?.codec === 'hevc'
+												? 'HEVC'
+												: videoStream?.codec?.toUpperCase() || '—'}
+										{:else}
+											—
+										{/if}
+									</td>
+									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+										{episode.Media?.[0]?.bitrate ? `${episode.Media[0].bitrate} Kbps` : '—'}
+									</td>
+									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
+											{@const videoStream = episode.Media[0].Part[0].Stream.find(
+												(s: any) => s.streamType === 1
+											)}
+											{videoStream?.bitrate ? `${videoStream.bitrate} Kbps` : '—'}
+										{:else}
+											—
+										{/if}
+									</td>
+									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
+										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
+											{@const audioStream = episode.Media[0].Part[0].Stream.find(
+												(s: any) => s.streamType === 2
+											)}
+											{audioStream?.bitrate ? `${audioStream.bitrate} Kbps` : '—'}
+										{:else}
+											—
+										{/if}
+									</td>
+								</tr>
 							{/each}
 						</tbody>
 					</table>

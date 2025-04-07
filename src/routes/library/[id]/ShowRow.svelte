@@ -1,11 +1,12 @@
 <script lang="ts">
 	export let show: any;
+	export let libraryId: string;
 
 	$: posterUrl = `${localStorage.getItem('plexServerUrl')}${show.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`;
 </script>
 
 <a
-	href="/library/{show.librarySectionID}/show/{show.ratingKey}"
+	href="/library/{libraryId}/show/{show.ratingKey}"
 	class="block bg-white rounded overflow-hidden hover:ring-1 hover:ring-orange-500 transition-shadow duration-200"
 >
 	<div class="aspect-[2/3] relative">
