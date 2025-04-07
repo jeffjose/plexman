@@ -34,12 +34,21 @@
 	let media: PlexItem[] = [];
 	let loading = true;
 	let error: string | null = null;
-	let sortField = 'originallyAvailableAt';
-	let sortDirection = 'asc';
+	let sortField = 'addedAt';
+	let sortDirection = 'desc';
 	let libraries: any[] = [];
 	let allSizes: number[] = [];
 	let allOverallBitrates: number[] = [];
 	let allVideoBitrates: number[] = [];
+
+	const SORT_OPTIONS = [
+		{ label: 'Recently Added ↓', field: 'addedAt', direction: 'desc' },
+		{ label: 'Recently Added ↑', field: 'addedAt', direction: 'asc' },
+		{ label: 'Release Date ↓', field: 'originallyAvailableAt', direction: 'desc' },
+		{ label: 'Release Date ↑', field: 'originallyAvailableAt', direction: 'asc' },
+		{ label: 'Title A-Z', field: 'title', direction: 'asc' },
+		{ label: 'Title Z-A', field: 'title', direction: 'desc' }
+	];
 
 	const searchQuery = writable('');
 	const sortFieldStore = writable(sortField);
@@ -347,6 +356,15 @@
 		goto('/login');
 	}
 
+	function handleSortSelect(event: Event) {
+		const select = event.target as HTMLSelectElement;
+		const option = SORT_OPTIONS[select.selectedIndex];
+		sortField = option.field;
+		sortDirection = option.direction;
+		sortFieldStore.set(option.field);
+		sortDirectionStore.set(option.direction);
+	}
+
 	onMount(() => {
 		fetchMedia();
 		fetchLibraries();
@@ -437,8 +455,8 @@
 				</div>
 			</div>
 		{:else}
-			<div class="mb-2">
-				<div class="relative">
+			<div class="mb-2 flex gap-2">
+				<div class="relative flex-1">
 					<input
 						type="text"
 						bind:value={searchInput}
@@ -469,6 +487,18 @@
 						</button>
 					{/if}
 				</div>
+				{#if type === 'movie'}
+					<select
+						on:change={handleSortSelect}
+						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
+					>
+						{#each SORT_OPTIONS as option}
+							<option selected={sortField === option.field && sortDirection === option.direction}>
+								{option.label}
+							</option>
+						{/each}
+					</select>
+				{/if}
 			</div>
 
 			<div class="bg-white shadow-sm rounded-lg overflow-hidden">

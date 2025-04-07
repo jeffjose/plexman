@@ -148,6 +148,13 @@
 				{#if item.originalTitle && item.originalTitle !== item.title}
 					<div class="text-xs text-gray-500">{item.originalTitle}</div>
 				{/if}
+				{#each mediaVersions as mediaItem}
+					{#if mediaItem?.Part?.[0]?.file}
+						<div class="text-xs text-gray-400 truncate max-w-md">
+							{mediaItem.Part[0].file.split('/').pop()}
+						</div>
+					{/if}
+				{/each}
 			</div>
 		</div>
 	</td>
