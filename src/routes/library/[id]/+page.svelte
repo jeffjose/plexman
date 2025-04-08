@@ -95,20 +95,19 @@
 
 					const size = mediaInfo.Part?.[0]?.size || 0;
 					const bitrate = mediaInfo.bitrate || 0;
-					const { sizePercentile, overallBitratePercentile } = getPercentiles(size, bitrate);
-					const avgPercentile = (sizePercentile + overallBitratePercentile) / 2;
+					const { overallBitratePercentile } = getPercentiles(size, bitrate);
 
 					switch ($qualityFilter) {
 						case '90p+':
-							return avgPercentile >= 90;
+							return overallBitratePercentile >= 90;
 						case '75-89p':
-							return avgPercentile >= 75 && avgPercentile < 90;
+							return overallBitratePercentile >= 75 && overallBitratePercentile < 90;
 						case '50-74p':
-							return avgPercentile >= 50 && avgPercentile < 75;
+							return overallBitratePercentile >= 50 && overallBitratePercentile < 75;
 						case '25-49p':
-							return avgPercentile >= 25 && avgPercentile < 50;
+							return overallBitratePercentile >= 25 && overallBitratePercentile < 50;
 						case '<25p':
-							return avgPercentile < 25;
+							return overallBitratePercentile < 25;
 						default:
 							return true;
 					}
@@ -538,7 +537,7 @@
 									<th
 										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 									>
-										Title
+										Title ({$filteredMedia.length})
 									</th>
 									<th
 										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
