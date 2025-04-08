@@ -246,15 +246,13 @@
 <div class="min-h-screen bg-gray-100">
 	<Header {libraries} />
 
-	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6">
 		{#if loading}
-			<div class="flex justify-center items-center h-64">
-				<div
-					class="w-16 h-16 border-t-4 border-orange-500 border-solid rounded-full animate-spin"
-				/>
+			<div class="flex justify-center items-center h-32">
+				<div class="w-8 h-8 border-t-2 border-orange-500 border-solid rounded-full animate-spin" />
 			</div>
 		{:else if error}
-			<div class="bg-red-50 p-4 rounded-md">
+			<div class="bg-red-50 p-3 rounded-md">
 				<div class="flex">
 					<div class="flex-shrink-0">
 						<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
@@ -267,75 +265,76 @@
 					</div>
 					<div class="ml-3">
 						<h3 class="text-sm font-medium text-red-800">Error loading media</h3>
-						<div class="mt-2 text-sm text-red-700">{error}</div>
+						<div class="mt-1 text-sm text-red-700">{error}</div>
 					</div>
 				</div>
 			</div>
 		{:else}
-			<div class="space-y-6">
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 				<!-- Quality Distribution -->
-				<div class="bg-white shadow rounded-lg p-6">
-					<h2 class="text-lg font-medium text-gray-900 mb-4">Quality Distribution</h2>
-					<div class="grid grid-cols-5 gap-4">
+				<div class="bg-white shadow rounded-lg p-4">
+					<h2 class="text-sm font-medium text-gray-900 mb-3">Quality Distribution</h2>
+					<div class="grid grid-cols-5 gap-2">
 						{#each Object.entries(qualityBuckets) as [bucket, count]}
 							<div class="text-center">
-								<div class="text-2xl font-bold">{count}</div>
-								<div class="text-sm text-gray-500">{bucket}</div>
+								<div class="text-xl font-bold">{count}</div>
+								<div class="text-xs text-gray-500">{bucket}</div>
 							</div>
 						{/each}
 					</div>
 				</div>
 
 				<!-- Codec Distribution -->
-				<div class="bg-white shadow rounded-lg p-6">
-					<h2 class="text-lg font-medium text-gray-900 mb-4">Codec Distribution</h2>
-					<div class="grid grid-cols-3 gap-4">
+				<div class="bg-white shadow rounded-lg p-4">
+					<h2 class="text-sm font-medium text-gray-900 mb-3">Codec Distribution</h2>
+					<div class="grid grid-cols-3 gap-2">
 						<div class="text-center">
-							<div class="text-2xl font-bold">{codecStats.hevc}</div>
-							<div class="text-sm text-gray-500">HEVC</div>
+							<div class="text-xl font-bold">{codecStats.hevc}</div>
+							<div class="text-xs text-gray-500">HEVC</div>
 						</div>
 						<div class="text-center">
-							<div class="text-2xl font-bold">{codecStats.h264}</div>
-							<div class="text-sm text-gray-500">H.264</div>
+							<div class="text-xl font-bold">{codecStats.h264}</div>
+							<div class="text-xs text-gray-500">H.264</div>
 						</div>
 						<div class="text-center">
-							<div class="text-2xl font-bold">{codecStats.other}</div>
-							<div class="text-sm text-gray-500">Other</div>
+							<div class="text-xl font-bold">{codecStats.other}</div>
+							<div class="text-xs text-gray-500">Other</div>
 						</div>
 					</div>
 				</div>
 
 				<!-- File Size Stats -->
-				<div class="bg-white shadow rounded-lg p-6">
-					<h2 class="text-lg font-medium text-gray-900 mb-4">File Size Statistics</h2>
-					<div class="grid grid-cols-3 gap-4 mb-6">
-						<div>
-							<div class="text-sm text-gray-500">Average</div>
-							<div class="text-lg font-medium">{formatFileSize(fileSizeStats.avg)}</div>
-						</div>
-						<div>
-							<div class="text-sm text-gray-500">Median</div>
-							<div class="text-lg font-medium">{formatFileSize(fileSizeStats.median)}</div>
-						</div>
-						<div>
-							<div class="text-sm text-gray-500">90th Percentile</div>
-							<div class="text-lg font-medium">{formatFileSize(fileSizeStats.p90)}</div>
+				<div class="bg-white shadow rounded-lg p-4 md:col-span-2">
+					<div class="flex items-center justify-between mb-3">
+						<h2 class="text-sm font-medium text-gray-900">File Size Statistics</h2>
+						<div class="flex space-x-4 text-sm">
+							<div>
+								<span class="text-gray-500">Avg:</span>
+								<span class="font-medium ml-1">{formatFileSize(fileSizeStats.avg)}</span>
+							</div>
+							<div>
+								<span class="text-gray-500">Median:</span>
+								<span class="font-medium ml-1">{formatFileSize(fileSizeStats.median)}</span>
+							</div>
+							<div>
+								<span class="text-gray-500">90th:</span>
+								<span class="font-medium ml-1">{formatFileSize(fileSizeStats.p90)}</span>
+							</div>
 						</div>
 					</div>
 
 					<!-- File Size Histogram -->
-					<h3 class="text-md font-medium text-gray-700 mb-2">Size Distribution</h3>
-					<div class="space-y-2">
+					<div class="space-y-1">
 						{#each fileSizeStats.histogram as { bucket, count }}
-							<div class="flex items-center">
-								<div class="w-32 text-sm text-gray-500">{bucket}</div>
-								<div class="flex-1">
+							<div class="flex items-center text-sm">
+								<div class="w-24 text-xs text-gray-500 truncate" title={bucket}>{bucket}</div>
+								<div class="flex-1 mx-2">
 									<div
-										class="bg-orange-200 rounded"
-										style="width: {(count / media.length) * 100}%; height: 20px;"
+										class="bg-orange-200 rounded-sm"
+										style="width: {(count / media.length) * 100}%; height: 16px;"
 									/>
 								</div>
-								<div class="w-16 text-sm text-gray-500 text-right">{count}</div>
+								<div class="w-10 text-xs text-gray-500 text-right">{count}</div>
 							</div>
 						{/each}
 					</div>
