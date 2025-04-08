@@ -511,7 +511,7 @@
 						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
 						on:click={() => qualityFilter.update((v) => (v === '25-49p' ? null : '25-49p'))}
 					>
-						<span class="text-orange-500">●○○○</span>
+						<span class="text-orange-500">●●○○</span>
 					</button>
 					<button
 						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"

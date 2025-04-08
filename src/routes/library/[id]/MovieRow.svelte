@@ -129,7 +129,7 @@
 												? 'text-teal-500'
 												: 'text-gray-200'
 											: percentiles.overallBitratePercentile >= 25
-												? i === 0
+												? i <= 1
 													? 'text-orange-500'
 													: 'text-gray-200'
 												: i === 0
