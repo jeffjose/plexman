@@ -41,6 +41,7 @@
 	let allSizes: number[] = [];
 	let allOverallBitrates: number[] = [];
 	let allVideoBitrates: number[] = [];
+	let libraryType: 'movie' | 'show' | null = null;
 
 	const SORT_OPTIONS = [
 		{ label: 'Recently Added ↓', field: 'addedAt', direction: 'desc' },
@@ -108,6 +109,13 @@
 	}
 
 	$: libraryId = $page.params.id;
+
+	// Add this reactive statement to set library type
+	$: {
+		const currentLibrary = libraries.find((lib) => lib.key === libraryId);
+		libraryType =
+			currentLibrary?.type === 'movie' ? 'movie' : currentLibrary?.type === 'show' ? 'show' : null;
+	}
 
 	const filteredMedia = derived(
 		[searchQuery, sortFieldStore, sortDirectionStore, qualityFilter, showMultiFileOnly],
@@ -236,6 +244,7 @@
 			const response = await fetch(
 				`${serverUrl}/library/sections/${libraryId}/all?` +
 					new URLSearchParams({
+						type: libraryType === 'show' ? '2' : '1',
 						includeExternalMedia: '1',
 						includePreferences: '1',
 						checkFiles: '1',
