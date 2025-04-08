@@ -508,6 +508,12 @@
 							</option>
 						{/each}
 					</select>
+					<a
+						href="/library/{libraryId}/stats"
+						class="px-3 py-1.5 text-sm font-medium rounded-md bg-orange-500 text-white hover:bg-orange-600"
+					>
+						View Stats
+					</a>
 				</div>
 			</div>
 
