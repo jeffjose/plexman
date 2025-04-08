@@ -41,8 +41,6 @@
 	let allSizes: number[] = [];
 	let allOverallBitrates: number[] = [];
 	let allVideoBitrates: number[] = [];
-	const qualityFilter = writable<string | null>(null);
-	const showMultiFileOnly = writable(false);
 
 	const SORT_OPTIONS = [
 		{ label: 'Recently Added ↓', field: 'addedAt', direction: 'desc' },
@@ -53,11 +51,54 @@
 		{ label: 'Title Z-A', field: 'title', direction: 'desc' }
 	];
 
-	const searchQuery = writable('');
-	const sortFieldStore = writable(sortField);
-	const sortDirectionStore = writable(sortDirection);
-	let searchInput = '';
+	// Initialize stores with values from URL
+	const searchQuery = writable($page.url.searchParams.get('search') || '');
+	const qualityFilter = writable<string | null>($page.url.searchParams.get('quality') || null);
+	const showMultiFileOnly = writable($page.url.searchParams.get('multifile') === 'true');
+	const sortFieldStore = writable($page.url.searchParams.get('sort') || sortField);
+	const sortDirectionStore = writable($page.url.searchParams.get('direction') || sortDirection);
+
+	let searchInput = $page.url.searchParams.get('search') || '';
 	let searchTimeout: ReturnType<typeof setTimeout>;
+
+	// Update URL when filters change
+	onMount(() => {
+		// Subscribe to store changes and update URL
+		const unsubscribe = derived(
+			[searchQuery, qualityFilter, showMultiFileOnly, sortFieldStore, sortDirectionStore],
+			([
+				$searchQuery,
+				$qualityFilter,
+				$showMultiFileOnly,
+				$sortFieldStore,
+				$sortDirectionStore
+			]) => {
+				const url = new URL(window.location.href);
+
+				if ($searchQuery) url.searchParams.set('search', $searchQuery);
+				else url.searchParams.delete('search');
+
+				if ($qualityFilter) url.searchParams.set('quality', $qualityFilter);
+				else url.searchParams.delete('quality');
+
+				if ($showMultiFileOnly) url.searchParams.set('multifile', 'true');
+				else url.searchParams.delete('multifile');
+
+				if ($sortFieldStore !== 'addedAt') url.searchParams.set('sort', $sortFieldStore);
+				else url.searchParams.delete('sort');
+
+				if ($sortDirectionStore !== 'desc') url.searchParams.set('direction', $sortDirectionStore);
+				else url.searchParams.delete('direction');
+
+				if (url.toString() !== window.location.href) {
+					history.replaceState(null, '', url);
+				}
+			}
+		).subscribe(() => {});
+
+		// Clean up subscription on component unmount
+		return () => unsubscribe();
+	});
 
 	function debounceSearch(value: string) {
 		clearTimeout(searchTimeout);
@@ -67,7 +108,6 @@
 	}
 
 	$: libraryId = $page.params.id;
-	$: type = $page.url.searchParams.get('type') || 'movie';
 
 	const filteredMedia = derived(
 		[searchQuery, sortFieldStore, sortDirectionStore, qualityFilter, showMultiFileOnly],
@@ -81,14 +121,13 @@
 					const searchLower = $searchQuery.toLowerCase();
 					return (
 						item.title.toLowerCase().includes(searchLower) ||
-						(item.originalTitle || '').toLowerCase().includes(searchLower) ||
-						(type === 'show' && item.year?.toString().includes(searchLower))
+						(item.originalTitle || '').toLowerCase().includes(searchLower)
 					);
 				});
 			}
 
 			// Apply quality filter if selected
-			if ($qualityFilter && type === 'movie') {
+			if ($qualityFilter) {
 				result = media.filter((item) => {
 					const mediaInfo = item.Media?.[0];
 					if (!mediaInfo) return false;
@@ -115,7 +154,7 @@
 			}
 
 			// Apply multi-file filter if selected
-			if ($showMultiFileOnly && type === 'movie') {
+			if ($showMultiFileOnly) {
 				result = media.filter((item) => {
 					return item.Media && item.Media.length > 1;
 				});
@@ -197,11 +236,13 @@
 			const response = await fetch(
 				`${serverUrl}/library/sections/${libraryId}/all?` +
 					new URLSearchParams({
-						type: type === 'show' ? '2' : '1',
 						includeExternalMedia: '1',
 						includePreferences: '1',
 						checkFiles: '1',
-						asyncCheckFiles: '0'
+						asyncCheckFiles: '0',
+						...($qualityFilter ? { 'label!': $qualityFilter } : {}),
+						...($showMultiFileOnly ? { 'Media.Part>': '1' } : {}),
+						...($searchQuery ? { title: $searchQuery } : {})
 					}),
 				{ headers }
 			);
@@ -440,39 +481,14 @@
 				</div>
 			</div>
 		{:else}
-			<div class="mb-2 flex gap-2">
-				<div class="relative flex-1">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center space-x-4">
 					<input
 						type="text"
-						bind:value={searchInput}
-						on:input={() => debounceSearch(searchInput)}
-						placeholder={type === 'show' ? 'Search TV shows...' : 'Search movies...'}
-						class="w-full px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
+						placeholder="Search movies..."
+						bind:value={$searchQuery}
+						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
 					/>
-					{#if searchInput}
-						<button
-							on:click={() => {
-								searchInput = '';
-								searchQuery.set('');
-							}}
-							class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-4 w-4"
-								viewBox="0 0 20 20"
-								fill="currentColor"
-							>
-								<path
-									fill-rule="evenodd"
-									d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-									clip-rule="evenodd"
-								/>
-							</svg>
-						</button>
-					{/if}
-				</div>
-				{#if type === 'movie'}
 					<select
 						on:change={handleSortSelect}
 						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
@@ -483,137 +499,125 @@
 							</option>
 						{/each}
 					</select>
-				{/if}
+				</div>
 			</div>
 
-			{#if type === 'movie'}
-				<div class="mb-4 flex flex-wrap gap-2">
-					<button
-						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-						on:click={() => qualityFilter.update((v) => (v === '90p+' ? null : '90p+'))}
-					>
-						<span class="text-green-500">★★★★</span>
-					</button>
-					<button
-						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-						on:click={() => qualityFilter.update((v) => (v === '75-89p' ? null : '75-89p'))}
-					>
-						<span class="text-green-500">●●●●</span>
-					</button>
-					<button
-						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-						on:click={() => qualityFilter.update((v) => (v === '50-74p' ? null : '50-74p'))}
-					>
-						<span class="text-teal-500">●●●○</span>
-					</button>
-					<button
-						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-						on:click={() => qualityFilter.update((v) => (v === '25-49p' ? null : '25-49p'))}
-					>
-						<span class="text-orange-500">●●○○</span>
-					</button>
-					<button
-						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-						on:click={() => qualityFilter.update((v) => (v === '<25p' ? null : '<25p'))}
-					>
-						<span class="text-red-500">●○○○</span>
-					</button>
-					<button
-						class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-						on:click={() => showMultiFileOnly.update((v) => !v)}
-					>
-						Multiple Files
-					</button>
-				</div>
-			{/if}
+			<div class="mb-4 flex flex-wrap gap-2">
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+					on:click={() => qualityFilter.update((v) => (v === '90p+' ? null : '90p+'))}
+				>
+					<span class="text-green-500">★★★★</span>
+				</button>
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+					on:click={() => qualityFilter.update((v) => (v === '75-89p' ? null : '75-89p'))}
+				>
+					<span class="text-green-500">●●●●</span>
+				</button>
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+					on:click={() => qualityFilter.update((v) => (v === '50-74p' ? null : '50-74p'))}
+				>
+					<span class="text-teal-500">●●●○</span>
+				</button>
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+					on:click={() => qualityFilter.update((v) => (v === '25-49p' ? null : '25-49p'))}
+				>
+					<span class="text-orange-500">●●○○</span>
+				</button>
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+					on:click={() => qualityFilter.update((v) => (v === '<25p' ? null : '<25p'))}
+				>
+					<span class="text-red-500">●○○○</span>
+				</button>
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
+					on:click={() => showMultiFileOnly.update((v) => !v)}
+				>
+					Multiple Files
+				</button>
+			</div>
 
 			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
 				<div class="overflow-x-auto">
-					{#if type === 'movie'}
-						<table class="min-w-full divide-y divide-gray-200">
-							<thead class="bg-gray-50">
-								<tr>
-									<th class="px-1 py-1 w-12"></th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+					<table class="min-w-full divide-y divide-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th class="px-1 py-1 w-12"></th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								>
+									Title ({$filteredMedia.length})
+								</th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
+								>
+									<button
+										type="button"
+										class="w-full text-left hover:bg-gray-100"
+										on:click={() => handleSort('year')}
+										on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
 									>
-										Title ({$filteredMedia.length})
-									</th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
-									>
+										Year
+										{#if sortField === 'year'}
+											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+										{/if}
+									</button>
+								</th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>
+									Duration
+								</th>
+								<th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								>
+									<div class="flex items-center space-x-2">
+										<div class="w-14">Size</div>
+										<div class="w-24">Format</div>
 										<button
 											type="button"
-											class="w-full text-left hover:bg-gray-100"
-											on:click={() => handleSort('year')}
-											on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
+											class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+											on:click={() => handleSort('overallBitrate')}
+											on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
 										>
-											Year
-											{#if sortField === 'year'}
+											Overall
+											{#if sortField === 'overallBitrate'}
 												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
 											{/if}
 										</button>
-									</th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-									>
-										Duration
-									</th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>
-										<div class="flex items-center space-x-2">
-											<div class="w-14">Size</div>
-											<div class="w-24">Format</div>
-											<button
-												type="button"
-												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-												on:click={() => handleSort('overallBitrate')}
-												on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
-											>
-												Overall
-												{#if sortField === 'overallBitrate'}
-													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-												{/if}
-											</button>
-											<button
-												type="button"
-												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-												on:click={() => handleSort('videoBitrate')}
-												on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
-											>
-												Video
-												{#if sortField === 'videoBitrate'}
-													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-												{/if}
-											</button>
-											<div class="w-14">Audio</div>
-										</div>
-									</th>
-								</tr>
-							</thead>
-							<tbody class="bg-white divide-y divide-gray-200">
-								{#each $filteredMedia as item (item.ratingKey)}
-									<MovieRow
-										{item}
-										{detailedMedia}
-										onDebug={debugMovie}
-										{formatDuration}
-										{formatFileSize}
-										{getPercentiles}
-									/>
-								{/each}
-							</tbody>
-						</table>
-					{:else}
-						<div
-							class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2 p-2"
-						>
-							{#each $filteredMedia as show (show.ratingKey)}
-								<ShowRow {show} {libraryId} />
+										<button
+											type="button"
+											class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+											on:click={() => handleSort('videoBitrate')}
+											on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
+										>
+											Video
+											{#if sortField === 'videoBitrate'}
+												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+											{/if}
+										</button>
+										<div class="w-14">Audio</div>
+									</div>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="bg-white divide-y divide-gray-200">
+							{#each $filteredMedia as item (item.ratingKey)}
+								<MovieRow
+									{item}
+									{detailedMedia}
+									onDebug={debugMovie}
+									{formatDuration}
+									{formatFileSize}
+									{getPercentiles}
+								/>
 							{/each}
-						</div>
-					{/if}
+						</tbody>
+					</table>
 				</div>
 			</div>
 		{/if}
