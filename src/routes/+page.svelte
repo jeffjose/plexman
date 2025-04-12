@@ -105,11 +105,37 @@
 
 			if (!server) throw new Error('No Plex server found');
 
-			// Store the server URL for later use
-			const serverUrl = server.connections[0].uri;
+			// Intelligently select the server URL based on connection type
+			const connections = server.connections || [];
+			let preferredUri: string | undefined = undefined;
+			let fallbackUri: string | undefined = undefined;
+
+			// Check if the app is running on HTTPS
+			const isHttps = window.location.protocol === 'https:';
+
+			if (isHttps) {
+				// Prioritize secure, remote connections if available
+				preferredUri = connections.find(
+					(c: any) => c.uri.startsWith('https://') && c.uri.includes('.plex.direct')
+				)?.uri;
+				// Otherwise, find any secure connection
+				if (!preferredUri) {
+					preferredUri = connections.find((c: any) => c.uri.startsWith('https://'))?.uri;
+				}
+			}
+
+			// Find a local HTTP connection as a fallback or if not on HTTPS
+			fallbackUri = connections.find((c: any) => c.uri.startsWith('http://'))?.uri;
+
+			// Choose the best available URI: Preferred (HTTPS if app is HTTPS) -> Fallback (HTTP) -> First available
+			const serverUrl = preferredUri || fallbackUri || connections[0]?.uri;
+
+			if (!serverUrl) {
+				throw new Error('No suitable connection URI found for the Plex server');
+			}
 			localStorage.setItem('plexServerUrl', serverUrl);
 
-			// Then fetch the libraries from the first server
+			// Then fetch the libraries from the selected server URL
 			const libraryResponse = await fetch(`${serverUrl}/library/sections`, {
 				headers
 			});
