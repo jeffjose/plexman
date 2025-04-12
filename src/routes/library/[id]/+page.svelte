@@ -455,9 +455,9 @@
 		sortDirectionStore.set(option.direction);
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		await fetchLibraries();
 		fetchMedia();
-		fetchLibraries();
 	});
 </script>
 
@@ -556,85 +556,95 @@
 				</button>
 			</div>
 
-			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
-				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th class="px-1 py-1 w-12"></th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-								>
-									Title ({$filteredMedia.length})
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
-								>
-									<button
-										type="button"
-										class="w-full text-left hover:bg-gray-100"
-										on:click={() => handleSort('year')}
-										on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
-									>
-										Year
-										{#if sortField === 'year'}
-											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-										{/if}
-									</button>
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Duration
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-								>
-									<div class="flex items-center space-x-2">
-										<div class="w-14">Size</div>
-										<div class="w-24">Format</div>
-										<button
-											type="button"
-											class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-											on:click={() => handleSort('overallBitrate')}
-											on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
-										>
-											Overall
-											{#if sortField === 'overallBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</button>
-										<button
-											type="button"
-											class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-											on:click={() => handleSort('videoBitrate')}
-											on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
-										>
-											Video
-											{#if sortField === 'videoBitrate'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</button>
-										<div class="w-14">Audio</div>
-									</div>
-								</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-200">
-							{#each $filteredMedia as item (item.ratingKey)}
-								<MovieRow
-									{item}
-									{detailedMedia}
-									onDebug={debugMovie}
-									{formatDuration}
-									{formatFileSize}
-									{getPercentiles}
-								/>
-							{/each}
-						</tbody>
-					</table>
+			{#if libraryType === 'show'}
+				<div
+					class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2"
+				>
+					{#each $filteredMedia as item (item.ratingKey)}
+						<ShowRow show={item} {libraryId} />
+					{/each}
 				</div>
-			</div>
+			{:else if libraryType === 'movie'}
+				<div class="bg-white shadow-sm rounded-lg overflow-hidden">
+					<div class="overflow-x-auto">
+						<table class="min-w-full divide-y divide-gray-200">
+							<thead class="bg-gray-50">
+								<tr>
+									<th class="px-1 py-1 w-12"></th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
+										Title ({$filteredMedia.length})
+									</th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
+									>
+										<button
+											type="button"
+											class="w-full text-left hover:bg-gray-100"
+											on:click={() => handleSort('year')}
+											on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
+										>
+											Year
+											{#if sortField === 'year'}
+												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+											{/if}
+										</button>
+									</th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+									>
+										Duration
+									</th>
+									<th
+										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>
+										<div class="flex items-center space-x-2">
+											<div class="w-14">Size</div>
+											<div class="w-24">Format</div>
+											<button
+												type="button"
+												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+												on:click={() => handleSort('overallBitrate')}
+												on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
+											>
+												Overall
+												{#if sortField === 'overallBitrate'}
+													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+											<button
+												type="button"
+												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+												on:click={() => handleSort('videoBitrate')}
+												on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
+											>
+												Video
+												{#if sortField === 'videoBitrate'}
+													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+												{/if}
+											</button>
+											<div class="w-14">Audio</div>
+										</div>
+									</th>
+								</tr>
+							</thead>
+							<tbody class="bg-white divide-y divide-gray-200">
+								{#each $filteredMedia as item (item.ratingKey)}
+									<MovieRow
+										{item}
+										{detailedMedia}
+										onDebug={debugMovie}
+										{formatDuration}
+										{formatFileSize}
+										{getPercentiles}
+									/>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</main>
 </div>
