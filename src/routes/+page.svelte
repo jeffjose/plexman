@@ -32,6 +32,7 @@
 
 		try {
 			const response = await fetch(`${serverUrl}/status/sessions`, { headers });
+			console.log(`fetchSessions: Using serverUrl: ${serverUrl}`);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch sessions');
@@ -104,6 +105,8 @@
 			const server = resources.find((r: any) => r.provides.includes('server'));
 
 			if (!server) throw new Error('No Plex server found');
+			console.log('fetchLibraries: Found server:', server);
+			console.log('fetchLibraries: Raw connections:', server.connections);
 
 			// Intelligently select the server URL based on connection type
 			const connections = server.connections || [];
@@ -112,6 +115,7 @@
 
 			// Check if the app is running on HTTPS
 			const isHttps = window.location.protocol === 'https:';
+			console.log(`fetchLibraries: isHttps = ${isHttps}`);
 
 			if (isHttps) {
 				// Prioritize secure, remote connections if available
@@ -127,6 +131,8 @@
 			// Find a local HTTP connection as a fallback or if not on HTTPS
 			fallbackUri = connections.find((c: any) => c.uri.startsWith('http://'))?.uri;
 
+			console.log(`fetchLibraries: preferredUri = ${preferredUri}, fallbackUri = ${fallbackUri}`);
+
 			// Choose the best available URI: Preferred (HTTPS if app is HTTPS) -> Fallback (HTTP) -> First available
 			const serverUrl = preferredUri || fallbackUri || connections[0]?.uri;
 
@@ -134,6 +140,7 @@
 				throw new Error('No suitable connection URI found for the Plex server');
 			}
 			localStorage.setItem('plexServerUrl', serverUrl);
+			console.log(`fetchLibraries: Stored serverUrl: ${serverUrl}`);
 
 			// Then fetch the libraries from the selected server URL
 			const libraryResponse = await fetch(`${serverUrl}/library/sections`, {
@@ -182,6 +189,7 @@
 	onMount(() => {
 		fetchLibraries();
 		fetchSessions();
+		console.log('onMount: fetchLibraries and fetchSessions called');
 		// Set up polling for sessions every 10 seconds
 		const interval = setInterval(fetchSessions, 10000);
 		return () => clearInterval(interval);
