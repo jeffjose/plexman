@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
+	import { goto, afterNavigate } from '$app/navigation';
 	import { writable, derived } from 'svelte/store';
 	import Header from '../../../components/Header.svelte';
 	import MovieRow from './MovieRow.svelte';
@@ -458,6 +458,20 @@
 	onMount(async () => {
 		await fetchLibraries();
 		fetchMedia();
+	});
+
+	// Re-fetch data after navigating between libraries
+	afterNavigate(() => {
+		// Reset state only if it's not the initial load (optional, but good practice)
+		// onMount handles the initial fetch sequence correctly.
+		// We just need to ensure subsequent navigations re-fetch.
+		// Check if media already exists from a previous library view.
+		if (media.length > 0) {
+			loading = true;
+			media = []; // Clear old data
+			error = null;
+			fetchMedia(); // Fetch data for the new library
+		}
 	});
 </script>
 
