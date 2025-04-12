@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
-	import { goto, afterNavigate } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { writable, derived } from 'svelte/store';
 	import Header from '../../../components/Header.svelte';
 	import MovieRow from './MovieRow.svelte';
@@ -32,7 +32,11 @@
 		[key: string]: any; // Allow any string key for dynamic access
 	}
 
-	let media: PlexItem[] = [];
+	// Change media to a writable store
+	const mediaStore = writable<PlexItem[]>([]);
+	// Remove the old let media declaration
+	// let media: PlexItem[] = [];
+
 	let loading = true;
 	let error: string | null = null;
 	let sortField = 'addedAt';
@@ -108,20 +112,62 @@
 		}, 250);
 	}
 
+	// Reactive libraryId from route param
 	$: libraryId = $page.params.id;
 
-	// Add this reactive statement to set library type
+	// Fetch libraries once on initial mount
+	onMount(async () => {
+		await fetchLibraries();
+		// Initial media fetch is handled by the reactive block below once libraries load
+	});
+
+	// Reactive block to fetch media when libraryId changes OR libraries load
 	$: {
-		const currentLibrary = libraries.find((lib) => lib.key === libraryId);
-		libraryType =
-			currentLibrary?.type === 'movie' ? 'movie' : currentLibrary?.type === 'show' ? 'show' : null;
+		if (libraryId && libraries.length > 0) {
+			const currentLibrary = libraries.find((lib) => lib.key === libraryId);
+			const currentLibraryType =
+				currentLibrary?.type === 'movie'
+					? 'movie'
+					: currentLibrary?.type === 'show'
+						? 'show'
+						: null;
+
+			if (currentLibraryType) {
+				// console.log(`Library ID ${libraryId} changed or libraries loaded. Type: ${currentLibraryType}. Fetching...`);
+				// Immediately set loading state and clear old data
+				loading = true;
+				mediaStore.set([]); // Clear the store
+				error = null;
+				fetchMedia(libraryId, currentLibraryType);
+			} else {
+				// Handle case where library exists but type is unknown/unsupported
+				loading = false;
+				error = `Library ${libraryId} has an unsupported type: ${currentLibrary?.type}`;
+				mediaStore.set([]); // Clear the store
+			}
+		} else if (libraryId && libraries.length === 0) {
+			// Libraries haven't loaded yet, remain in loading state or handle appropriately
+			// loading = true; // Already true by default or set by previous navigation
+		} else {
+			// Initial state before libraryId is set or if libraryId is invalid
+			loading = false;
+			mediaStore.set([]); // Clear the store
+			error = 'Invalid Library ID.';
+		}
 	}
 
 	const filteredMedia = derived(
-		[searchQuery, sortFieldStore, sortDirectionStore, qualityFilter, showMultiFileOnly],
-		([$searchQuery, $sortField, $sortDirection, $qualityFilter, $showMultiFileOnly]) => {
-			// Start with the original media list
-			let result = media;
+		[mediaStore, searchQuery, sortFieldStore, sortDirectionStore, qualityFilter, showMultiFileOnly],
+		([
+			$mediaStore,
+			$searchQuery,
+			$sortField,
+			$sortDirection,
+			$qualityFilter,
+			$showMultiFileOnly
+		]) => {
+			// Start with the original media list from the store
+			let result = $mediaStore; // Use $mediaStore here
 
 			// Apply search filter if there's a query
 			if ($searchQuery) {
@@ -136,7 +182,11 @@
 
 			// Apply quality filter if selected
 			if ($qualityFilter) {
-				result = media.filter((item) => {
+				// IMPORTANT: Need to filter based on the *original* store value,
+				// not the potentially already search-filtered 'result'
+				// Or, chain the filters correctly. Let's chain them.
+				result = result.filter((item) => {
+					// Filter the current result set
 					const mediaInfo = item.Media?.[0];
 					if (!mediaInfo) return false;
 
@@ -163,7 +213,9 @@
 
 			// Apply multi-file filter if selected
 			if ($showMultiFileOnly) {
-				result = media.filter((item) => {
+				// IMPORTANT: Same as above, filter the current result set
+				result = result.filter((item) => {
+					// Filter the current result set
 					return item.Media && item.Media.length > 1;
 				});
 			}
@@ -218,13 +270,19 @@
 
 	let detailedMedia = new Map<string, any>(); // Store detailed info by ratingKey
 
-	async function fetchMedia() {
+	// Modify fetchMedia to accept id and type
+	async function fetchMedia(id: string, type: 'movie' | 'show') {
+		// Set loading state (might be redundant if called from reactive block, but safe)
+		loading = true;
+		error = null;
+
 		const token = localStorage.getItem('plexToken');
 		const clientId = localStorage.getItem('plexClientId');
 		const serverUrl = localStorage.getItem('plexServerUrl');
 
 		if (!token || !clientId || !serverUrl) {
 			goto('/login');
+			loading = false; // Ensure loading stops if redirecting
 			return;
 		}
 
@@ -241,17 +299,21 @@
 		};
 
 		try {
+			// Use passed id and type
 			const response = await fetch(
-				`${serverUrl}/library/sections/${libraryId}/all?` +
+				`${serverUrl}/library/sections/${id}/all?` +
 					new URLSearchParams({
-						type: libraryType === 'show' ? '2' : '1',
+						type: type === 'show' ? '2' : '1',
 						includeExternalMedia: '1',
 						includePreferences: '1',
-						checkFiles: '1',
-						asyncCheckFiles: '0',
-						...($qualityFilter ? { 'label!': $qualityFilter } : {}),
-						...($showMultiFileOnly ? { 'Media.Part>': '1' } : {}),
-						...($searchQuery ? { title: $searchQuery } : {})
+						checkFiles: '1', // Consider if these params are needed every time
+						asyncCheckFiles: '0'
+						// Filter/sort params from stores - Note: derived stores ($store) cannot be used directly here
+						// You might need to pass these as arguments too, or fetch unfiltered and rely on client-side filtering
+						// For now, removing server-side filtering based on stores from fetchMedia
+						// ...($qualityFilter ? { 'label!': $qualityFilter } : {}),
+						// ...($showMultiFileOnly ? { 'Media.Part>': '1' } : {}),
+						// ...($searchQuery ? { title: $searchQuery } : {})
 					}),
 				{ headers }
 			);
@@ -262,9 +324,11 @@
 			}
 
 			const data = await response.json();
-			media = data.MediaContainer.Metadata || [];
+			// Assign fetched data to the store
+			mediaStore.set(data.MediaContainer.Metadata || []);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'An error occurred';
+			mediaStore.set([]); // Clear media store on error
 			if (error.includes('X-Plex-Token is missing') || error.includes('invalid')) {
 				localStorage.removeItem('plexToken');
 				goto('/login');
@@ -274,13 +338,18 @@
 		}
 	}
 
+	// fetchLibraries remains the same, just fetches libraries
 	async function fetchLibraries() {
 		const token = localStorage.getItem('plexToken');
 		const clientId = localStorage.getItem('plexClientId');
 		const serverUrl = localStorage.getItem('plexServerUrl');
 
 		if (!token || !clientId || !serverUrl) {
-			goto('/login');
+			// Don't goto login here, might interfere with initial load
+			console.error('Auth details missing for fetchLibraries');
+			error = 'Authentication details missing.';
+			libraries = []; // Ensure libraries is empty
+			loading = false;
 			return;
 		}
 
@@ -303,9 +372,12 @@
 				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch libraries');
 			}
 			const data = await response.json();
-			libraries = data.MediaContainer.Directory;
+			libraries = data.MediaContainer.Directory || [];
 		} catch (e) {
 			console.error('Failed to fetch libraries:', e);
+			error = e instanceof Error ? e.message : 'Failed to load libraries.';
+			libraries = []; // Ensure libraries is empty on error
+			loading = false; // Stop loading if libraries fail
 		}
 	}
 
@@ -346,25 +418,29 @@
 		return Math.round((index / (sorted.length - 1)) * 100);
 	}
 
-	// Calculate all sizes and bitrates for percentiles
-	$: allSizes = media
+	// Calculate all sizes and bitrates for percentiles based on the store
+	$: allSizes = ($mediaStore || [])
 		.flatMap((item) => item.Media?.map((m: MediaItem) => m?.Part?.[0]?.size || 0) || [])
 		.filter((size) => size > 0);
-	$: allOverallBitrates = media
+	$: allOverallBitrates = ($mediaStore || [])
 		.flatMap((item) => item.Media?.map((m: MediaItem) => m?.bitrate || 0) || [])
 		.filter((br) => br > 0);
-	$: allVideoBitrates = media
-		.flatMap(
-			(item) =>
-				item.Media?.map((m: MediaItem) => {
-					const detailed = detailedMedia.get(item.ratingKey);
-					return (
-						detailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
-							?.bitrate ||
-						m?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
-						0
-					);
-				}) || []
+	$: allVideoBitrates = ($mediaStore || [])
+		.flatMap((item) =>
+			($mediaStore || []) // Use $mediaStore here too for consistency
+				.flatMap(
+					(item) =>
+						item.Media?.map((m: MediaItem) => {
+							const detailed = detailedMedia.get(item.ratingKey);
+							return (
+								detailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
+									?.bitrate ||
+								m?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
+								0
+							);
+						}) || []
+				)
+				.filter((br) => br > 0)
 		)
 		.filter((br) => br > 0);
 
@@ -376,7 +452,8 @@
 	}
 
 	function formatBitrate(bitrate: number): string {
-		const item = media.find((m) => m.Media?.[0]?.bitrate === bitrate);
+		// Find item in the store
+		const item = ($mediaStore || []).find((m) => m.Media?.[0]?.bitrate === bitrate);
 		if (!item) return `${bitrate} Kbps`;
 
 		const mediaInfo = item.Media?.[0];
@@ -454,25 +531,6 @@
 		sortFieldStore.set(option.field);
 		sortDirectionStore.set(option.direction);
 	}
-
-	onMount(async () => {
-		await fetchLibraries();
-		fetchMedia();
-	});
-
-	// Re-fetch data after navigating between libraries
-	afterNavigate(() => {
-		// Reset state only if it's not the initial load (optional, but good practice)
-		// onMount handles the initial fetch sequence correctly.
-		// We just need to ensure subsequent navigations re-fetch.
-		// Check if media already exists from a previous library view.
-		if (media.length > 0) {
-			loading = true;
-			media = []; // Clear old data
-			error = null;
-			fetchMedia(); // Fetch data for the new library
-		}
-	});
 </script>
 
 <div class="min-h-screen bg-gray-100">
@@ -570,7 +628,8 @@
 				</button>
 			</div>
 
-			{#if libraryType === 'show'}
+			{@const renderType = libraries.find((lib) => lib.key === libraryId)?.type}
+			{#if renderType === 'show'}
 				<div
 					class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2"
 				>
@@ -578,7 +637,7 @@
 						<ShowRow show={item} {libraryId} />
 					{/each}
 				</div>
-			{:else if libraryType === 'movie'}
+			{:else if renderType === 'movie'}
 				<div class="bg-white shadow-sm rounded-lg overflow-hidden">
 					<div class="overflow-x-auto">
 						<table class="min-w-full divide-y divide-gray-200">
