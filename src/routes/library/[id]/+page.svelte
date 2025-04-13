@@ -441,79 +441,80 @@
 				<span class="block sm:inline">{$errorStore}</span>
 			</div>
 		{:else}
-			<div class="mb-4 p-3 bg-white shadow rounded-lg flex flex-wrap items-center gap-3">
-				<div class="relative flex-grow max-w-xs">
+			<div class="mb-4 flex items-center justify-between">
+				<div class="flex items-center space-x-4">
 					<input
-						type="search"
+						type="text"
 						placeholder="Search title..."
 						bind:value={searchInput}
 						on:input={(e) => debounceSearch(e.currentTarget.value)}
-						class="block w-full pl-3 pr-3 py-1.5 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
 					/>
+					<select
+						on:change={(e) => {
+							const option = SORT_OPTIONS[e.currentTarget.selectedIndex];
+							sortFieldStore.set(option.field);
+							sortDirectionStore.set(option.direction);
+						}}
+						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
+					>
+						{#each SORT_OPTIONS as option}
+							<option
+								selected={$sortFieldStore === option.field &&
+									$sortDirectionStore === option.direction}
+							>
+								{option.label}
+							</option>
+						{/each}
+					</select>
+					<a
+						href="/library/{libraryId}/stats"
+						class="px-3 py-1.5 text-sm font-medium rounded-md bg-orange-500 text-white hover:bg-orange-600"
+					>
+						View Stats
+					</a>
 				</div>
-				<select
-					bind:value={$sortFieldStore}
-					on:change={(e) => handleSort(e.currentTarget.value)}
-					class="text-sm border-gray-300 rounded-md shadow-sm focus:border-orange-300 focus:ring focus:ring-orange-200 focus:ring-opacity-50"
-				>
-					{#each SORT_OPTIONS as option}
-						<option value={option.field}>{option.label}</option>
-					{/each}
-				</select>
-				<button
-					on:click={() => sortDirectionStore.update((d) => (d === 'asc' ? 'desc' : 'asc'))}
-					class="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50"
-					title="Toggle Sort Direction"
-				>
-					{#if $sortDirectionStore === 'asc'}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
-							/></svg
-						>
-					{:else}
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							class="h-4 w-4"
-							fill="none"
-							viewBox="0 0 24 24"
-							stroke="currentColor"
-							><path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3 4h13M3 8h9m-9 4h9m4-4l-4-4m0 0l-4 4m4-4v12m6 0h-4"
-							/></svg
-						>
-					{/if}
-				</button>
-				<select
-					bind:value={$qualityFilter}
-					class="text-sm border-gray-300 rounded-md shadow-sm focus:border-orange-300 focus:ring focus:ring-orange-200 focus:ring-opacity-50"
-				>
-					{#each QUALITY_FILTERS as filter}
-						<option value={filter.value}>{filter.label}</option>
-					{/each}
-				</select>
-				<label class="flex items-center space-x-2 text-sm">
-					<input
-						type="checkbox"
-						bind:checked={$showMultiFileOnly}
-						class="rounded border-gray-300 text-orange-600 shadow-sm focus:border-orange-300 focus:ring focus:ring-offset-0 focus:ring-orange-200 focus:ring-opacity-50"
-					/>
-					<span>Multiple Files Only</span>
-				</label>
-				<span class="text-sm text-gray-500 ml-auto"
+				<span class="text-sm text-gray-500"
 					>{$filteredAndSortedMedia.length} / {$mediaStore.length} items</span
 				>
+			</div>
+
+			<div class="mb-4 flex flex-wrap gap-2">
+				{#each QUALITY_FILTERS as filter}
+					<button
+						class:bg-orange-100={$qualityFilter === filter.value}
+						class:text-orange-700={$qualityFilter === filter.value}
+						class="px-3 py-1 text-xs font-medium rounded-md border border-gray-200 hover:bg-gray-50 {$qualityFilter ===
+						filter.value
+							? ''
+							: 'bg-white text-gray-700'}"
+						on:click={() =>
+							qualityFilter.set($qualityFilter === filter.value ? null : filter.value)}
+						title={filter.label}
+					>
+						{#if filter.value === '90p'}
+							<span class="text-green-500">★★★★</span>
+						{:else if filter.value === '75p'}
+							<span class="text-green-500">●●●●</span>
+						{:else if filter.value === '50p'}
+							<span class="text-teal-500">●●●○</span>
+						{:else if filter.value === '25p'}
+							<span class="text-orange-500">●●○○</span>
+						{:else if filter.value === '<25p'}
+							<span class="text-red-500">●○○○</span>
+						{:else}
+							All Qualities
+						{/if}
+					</button>
+				{/each}
+				<button
+					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 {$showMultiFileOnly
+						? 'bg-orange-100 text-orange-700'
+						: 'bg-white text-gray-700'} hover:bg-gray-50"
+					on:click={() => showMultiFileOnly.update((v) => !v)}
+				>
+					Multiple Files Only
+				</button>
 			</div>
 
 			{#if libraryType === 'movie'}
@@ -521,32 +522,42 @@
 					<table class="min-w-full divide-y divide-gray-200">
 						<thead class="bg-gray-50">
 							<tr>
-								<th scope="col" class="w-16 px-1 py-2"></th>
+								<th class="px-1 py-1 w-12"></th>
 								<th
-									scope="col"
-									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>Title</th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 								>
+									Title ({$filteredAndSortedMedia.length})
+								</th>
 								<th
-									scope="col"
-									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>Year</th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
 								>
+									<button
+										type="button"
+										class="w-full text-left hover:bg-gray-100 flex items-center"
+										on:click={() => handleSort('year')}
+										on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
+									>
+										Year
+										{#if $sortFieldStore === 'year'}
+											<span class="ml-1">{$sortDirectionStore === 'asc' ? '↑' : '↓'}</span>
+										{/if}
+									</button>
+								</th>
 								<th
-									scope="col"
-									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>Size</th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
 								>
+									Size
+								</th>
 								<th
-									scope="col"
-									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>Bitrate (File/Vid)</th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
 								>
+									Bitrate (File/Vid)
+								</th>
 								<th
-									scope="col"
-									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>Quality (File/Vid)</th
+									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
 								>
+									Quality (File/Vid)
+								</th>
 							</tr>
 						</thead>
 						<tbody class="bg-white divide-y divide-gray-200">
