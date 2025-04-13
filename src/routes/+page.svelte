@@ -32,7 +32,6 @@
 
 		try {
 			const response = await fetch(`${serverUrl}/status/sessions`, { headers });
-			console.log(`fetchSessions: Using serverUrl: ${serverUrl}`);
 			if (!response.ok) {
 				const errorData = await response.json();
 				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch sessions');
@@ -107,8 +106,6 @@
 			const server = resources.find((r: any) => r.provides.includes('server'));
 
 			if (!server) throw new Error('No Plex server found');
-			console.log('fetchLibraries: Found server:', server);
-			console.log('fetchLibraries: Raw connections:', server.connections);
 
 			// Intelligently select the server URL based on connection type and locality
 			const connections = server.connections || [];
@@ -116,7 +113,6 @@
 
 			// Check if the app is running on HTTPS (indicator of being deployed)
 			const isHttps = window.location.protocol === 'https:';
-			console.log(`fetchLibraries: isHttps = ${isHttps}`);
 
 			if (isHttps) {
 				// Running deployed (HTTPS): Prioritize remote HTTPS (prefer .plex.direct)
@@ -126,31 +122,32 @@
 					selectedUri = remoteHttps[0]?.uri; // Fallback to first remote HTTPS
 				}
 			} else {
-				// Running locally (likely HTTP): Prioritize local HTTP
-				const localHttp = connections.filter((c: any) => c.protocol === 'http' && c.local);
-				selectedUri = localHttp[0]?.uri;
-
-				// Fallbacks for local development if local HTTP not found
-				if (!selectedUri) {
-					const remoteHttp = connections.filter((c: any) => c.protocol === 'http' && !c.local);
-					selectedUri = remoteHttp[0]?.uri;
-				}
-				if (!selectedUri) {
-					const localHttps = connections.filter((c: any) => c.protocol === 'https' && c.local);
-					selectedUri =
-						localHttps.find((c: any) => c.uri.includes('.plex.direct'))?.uri || localHttps[0]?.uri;
-				}
-				if (!selectedUri) {
+				// Running locally (HTTP/other): Prioritize constructing URL from local connection details
+				const localConnection = connections.find((c: any) => c.local);
+				if (localConnection) {
+					// Construct URL using http, address, and port for local access
+					selectedUri = `http://${localConnection.address}:${localConnection.port}`;
+				} else {
+					// Fallback: If no local connection found, use best remote (HTTPS preferred)
+					console.warn('fetchLibraries: No local connection found, falling back to remote.');
 					const remoteHttps = connections.filter((c: any) => c.protocol === 'https' && !c.local);
 					selectedUri =
 						remoteHttps.find((c: any) => c.uri.includes('.plex.direct'))?.uri ||
 						remoteHttps[0]?.uri;
+
+					if (!selectedUri) {
+						// Last resort fallback: remote HTTP
+						const remoteHttp = connections.filter((c: any) => c.protocol === 'http' && !c.local);
+						selectedUri = remoteHttp[0]?.uri;
+					}
 				}
 			}
 
-			// Ultimate fallback: Use the first connection URI if nothing else matched (less ideal)
+			// Ultimate fallback: Use the first connection URI if nothing else matched
 			if (!selectedUri && connections.length > 0) {
-				console.warn('fetchLibraries: Could not find ideal connection, using first available.');
+				console.warn(
+					'fetchLibraries: Could not find ideal connection using protocol/locality, using first available URI as fallback.'
+				);
 				selectedUri = connections[0].uri;
 			}
 
@@ -211,7 +208,6 @@
 	onMount(() => {
 		fetchLibraries();
 		fetchSessions();
-		console.log('onMount: fetchLibraries and fetchSessions called');
 		// Set up polling for sessions every 10 seconds
 		const interval = setInterval(fetchSessions, 10000);
 		return () => clearInterval(interval);
