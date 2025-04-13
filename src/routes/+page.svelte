@@ -92,7 +92,9 @@
 
 		try {
 			// First, get the user's servers
-			const resourceResponse = await fetch('https://plex.tv/api/v2/resources', {
+			const resourcesUrl = new URL('https://plex.tv/api/v2/resources');
+			resourcesUrl.searchParams.set('includeHttps', '1');
+			const resourceResponse = await fetch(resourcesUrl.toString(), {
 				headers
 			});
 
@@ -108,39 +110,59 @@
 			console.log('fetchLibraries: Found server:', server);
 			console.log('fetchLibraries: Raw connections:', server.connections);
 
-			// Intelligently select the server URL based on connection type
+			// Intelligently select the server URL based on connection type and locality
 			const connections = server.connections || [];
-			let preferredUri: string | undefined = undefined;
-			let fallbackUri: string | undefined = undefined;
+			let selectedUri: string | undefined = undefined;
 
-			// Check if the app is running on HTTPS
+			// Check if the app is running on HTTPS (indicator of being deployed)
 			const isHttps = window.location.protocol === 'https:';
 			console.log(`fetchLibraries: isHttps = ${isHttps}`);
 
 			if (isHttps) {
-				// Prioritize secure, remote connections if available
-				preferredUri = connections.find(
-					(c: any) => c.uri.startsWith('https://') && c.uri.includes('.plex.direct')
-				)?.uri;
-				// Otherwise, find any secure connection
-				if (!preferredUri) {
-					preferredUri = connections.find((c: any) => c.uri.startsWith('https://'))?.uri;
+				// Running deployed (HTTPS): Prioritize remote HTTPS (prefer .plex.direct)
+				const remoteHttps = connections.filter((c: any) => c.protocol === 'https' && !c.local);
+				selectedUri = remoteHttps.find((c: any) => c.uri.includes('.plex.direct'))?.uri;
+				if (!selectedUri) {
+					selectedUri = remoteHttps[0]?.uri; // Fallback to first remote HTTPS
+				}
+			} else {
+				// Running locally (likely HTTP): Prioritize local HTTP
+				const localHttp = connections.filter((c: any) => c.protocol === 'http' && c.local);
+				selectedUri = localHttp[0]?.uri;
+
+				// Fallbacks for local development if local HTTP not found
+				if (!selectedUri) {
+					const remoteHttp = connections.filter((c: any) => c.protocol === 'http' && !c.local);
+					selectedUri = remoteHttp[0]?.uri;
+				}
+				if (!selectedUri) {
+					const localHttps = connections.filter((c: any) => c.protocol === 'https' && c.local);
+					selectedUri =
+						localHttps.find((c: any) => c.uri.includes('.plex.direct'))?.uri || localHttps[0]?.uri;
+				}
+				if (!selectedUri) {
+					const remoteHttps = connections.filter((c: any) => c.protocol === 'https' && !c.local);
+					selectedUri =
+						remoteHttps.find((c: any) => c.uri.includes('.plex.direct'))?.uri ||
+						remoteHttps[0]?.uri;
 				}
 			}
 
-			// Find a local HTTP connection as a fallback or if not on HTTPS
-			fallbackUri = connections.find((c: any) => c.uri.startsWith('http://'))?.uri;
+			// Ultimate fallback: Use the first connection URI if nothing else matched (less ideal)
+			if (!selectedUri && connections.length > 0) {
+				console.warn('fetchLibraries: Could not find ideal connection, using first available.');
+				selectedUri = connections[0].uri;
+			}
 
-			console.log(`fetchLibraries: preferredUri = ${preferredUri}, fallbackUri = ${fallbackUri}`);
-
-			// Choose the best available URI: Preferred (HTTPS if app is HTTPS) -> Fallback (HTTP) -> First available
-			const serverUrl = preferredUri || fallbackUri || connections[0]?.uri;
+			const serverUrl = selectedUri;
 
 			if (!serverUrl) {
-				throw new Error('No suitable connection URI found for the Plex server');
+				throw new Error(
+					'No suitable connection URI found for the Plex server based on context (HTTPS/Local)'
+				);
 			}
 			localStorage.setItem('plexServerUrl', serverUrl);
-			console.log(`fetchLibraries: Stored serverUrl: ${serverUrl}`);
+			console.log(`fetchLibraries: Stored serverUrl: ${serverUrl} (isHttps: ${isHttps})`);
 
 			// Then fetch the libraries from the selected server URL
 			const libraryResponse = await fetch(`${serverUrl}/library/sections`, {
