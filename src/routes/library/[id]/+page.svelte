@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
-	import { writable, derived } from 'svelte/store';
+	import { writable, derived, type Readable, get } from 'svelte/store';
 	import Header from '../../../components/Header.svelte';
 	import MovieRow from './MovieRow.svelte';
 	import ShowRow from './ShowRow.svelte';
@@ -28,180 +28,198 @@
 		originalTitle?: string;
 		year?: number;
 		originallyAvailableAt?: string;
+		addedAt: number; // Assuming it's a timestamp number
 		Media?: MediaItem[];
 		[key: string]: any; // Allow any string key for dynamic access
 	}
 
-	// Change media to a writable store
 	const mediaStore = writable<PlexItem[]>([]);
-	// Remove the old let media declaration
-	// let media: PlexItem[] = [];
+	const librariesStore = writable<any[]>([]);
+	const detailedMediaStore = writable<Map<string, any>>(new Map());
+	const errorStore = writable<string | null>(null);
+	const loadingStore = writable(true);
 
-	let loading = true;
-	let error: string | null = null;
-	let sortField = 'addedAt';
-	let sortDirection = 'desc';
-	let libraries: any[] = [];
-	let allSizes: number[] = [];
-	let allOverallBitrates: number[] = [];
-	let allVideoBitrates: number[] = [];
 	let libraryType: 'movie' | 'show' | null = null;
 
-	const SORT_OPTIONS = [
-		{ label: 'Recently Added ↓', field: 'addedAt', direction: 'desc' },
-		{ label: 'Recently Added ↑', field: 'addedAt', direction: 'asc' },
-		{ label: 'Release Date ↓', field: 'originallyAvailableAt', direction: 'desc' },
-		{ label: 'Release Date ↑', field: 'originallyAvailableAt', direction: 'asc' },
-		{ label: 'Title A-Z', field: 'title', direction: 'asc' },
-		{ label: 'Title Z-A', field: 'title', direction: 'desc' }
-	];
-
-	// Initialize stores with values from URL
 	const searchQuery = writable($page.url.searchParams.get('search') || '');
 	const qualityFilter = writable<string | null>($page.url.searchParams.get('quality') || null);
 	const showMultiFileOnly = writable($page.url.searchParams.get('multifile') === 'true');
-	const sortFieldStore = writable($page.url.searchParams.get('sort') || sortField);
-	const sortDirectionStore = writable($page.url.searchParams.get('direction') || sortDirection);
+	const sortFieldStore = writable($page.url.searchParams.get('sort') || 'addedAt');
+	const sortDirectionStore = writable($page.url.searchParams.get('direction') || 'desc');
 
 	let searchInput = $page.url.searchParams.get('search') || '';
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
-	// Update URL when filters change
-	onMount(() => {
-		// Subscribe to store changes and update URL
-		const unsubscribe = derived(
-			[searchQuery, qualityFilter, showMultiFileOnly, sortFieldStore, sortDirectionStore],
-			([
-				$searchQuery,
-				$qualityFilter,
-				$showMultiFileOnly,
-				$sortFieldStore,
-				$sortDirectionStore
-			]) => {
-				const url = new URL(window.location.href);
-
-				if ($searchQuery) url.searchParams.set('search', $searchQuery);
-				else url.searchParams.delete('search');
-
-				if ($qualityFilter) url.searchParams.set('quality', $qualityFilter);
-				else url.searchParams.delete('quality');
-
-				if ($showMultiFileOnly) url.searchParams.set('multifile', 'true');
-				else url.searchParams.delete('multifile');
-
-				if ($sortFieldStore !== 'addedAt') url.searchParams.set('sort', $sortFieldStore);
-				else url.searchParams.delete('sort');
-
-				if ($sortDirectionStore !== 'desc') url.searchParams.set('direction', $sortDirectionStore);
-				else url.searchParams.delete('direction');
-
-				if (url.toString() !== window.location.href) {
-					history.replaceState(null, '', url);
-				}
-			}
-		).subscribe(() => {});
-
-		// Clean up subscription on component unmount
-		return () => unsubscribe();
-	});
-
-	function debounceSearch(value: string) {
-		clearTimeout(searchTimeout);
-		searchTimeout = setTimeout(() => {
-			searchQuery.set(value);
-		}, 250);
-	}
-
-	// Reactive libraryId from route param
 	$: libraryId = $page.params.id;
 
-	// Fetch libraries once on initial mount
-	onMount(async () => {
-		await fetchLibraries();
-		// Initial media fetch is handled by the reactive block below once libraries load
-	});
+	$: libraryType = $librariesStore.find((lib) => lib.key === libraryId)?.type || null;
 
-	// Reactive block to fetch media when libraryId changes OR libraries load
-	$: {
-		if (libraryId && libraries.length > 0) {
-			const currentLibrary = libraries.find((lib) => lib.key === libraryId);
-			const currentLibraryType =
-				currentLibrary?.type === 'movie'
-					? 'movie'
-					: currentLibrary?.type === 'show'
-						? 'show'
-						: null;
+	const allSizesStore: Readable<number[]> = derived(mediaStore, ($mediaStore) =>
+		($mediaStore || [])
+			.flatMap((item) => item.Media?.map((m: MediaItem) => m?.Part?.[0]?.size || 0) || [])
+			.filter((size) => size > 0)
+	);
+	const allOverallBitratesStore: Readable<number[]> = derived(mediaStore, ($mediaStore) =>
+		($mediaStore || [])
+			.flatMap((item) => item.Media?.map((m: MediaItem) => m?.bitrate || 0) || [])
+			.filter((br) => br > 0)
+	);
+	const allVideoBitratesStore: Readable<number[]> = derived(mediaStore, ($mediaStore) =>
+		($mediaStore || [])
+			.flatMap(
+				(item) =>
+					item.Media?.flatMap(
+						(m: MediaItem) =>
+							m?.Part?.flatMap(
+								(p: MediaPart) =>
+									p?.Stream?.filter((s: Stream) => s.streamType === 1).map((s) => s.bitrate || 0) ||
+									[]
+							) || []
+					) || []
+			)
+			.filter((br) => br > 0)
+	);
 
-			if (currentLibraryType) {
-				// console.log(`Library ID ${libraryId} changed or libraries loaded. Type: ${currentLibraryType}. Fetching...`);
-				// Immediately set loading state and clear old data
-				loading = true;
-				mediaStore.set([]); // Clear the store
-				error = null;
-				fetchMedia(libraryId, currentLibraryType);
-			} else {
-				// Handle case where library exists but type is unknown/unsupported
-				loading = false;
-				error = `Library ${libraryId} has an unsupported type: ${currentLibrary?.type}`;
-				mediaStore.set([]); // Clear the store
+	async function fetchLibraries() {
+		try {
+			const response = await fetch(`/api/plex/library/sections`);
+			if (!response.ok) {
+				let errorMsg = 'Failed to fetch libraries';
+				try {
+					const errorData = await response.json();
+					errorMsg = errorData?.message || errorData?.error || errorMsg;
+				} catch (_) {}
+				if (response.status === 401) goto('/login');
+				throw new Error(`${errorMsg} (Status: ${response.status})`);
 			}
-		} else if (libraryId && libraries.length === 0) {
-			// Libraries haven't loaded yet, remain in loading state or handle appropriately
-			// loading = true; // Already true by default or set by previous navigation
-		} else {
-			// Initial state before libraryId is set or if libraryId is invalid
-			loading = false;
-			mediaStore.set([]); // Clear the store
-			error = 'Invalid Library ID.';
+			const data = await response.json();
+			librariesStore.set(data.MediaContainer.Directory || []);
+			errorStore.set(null);
+		} catch (e: any) {
+			console.error('Failed to fetch libraries:', e);
+			librariesStore.set([]);
+			errorStore.set(e.message || 'Failed to load libraries.');
 		}
 	}
 
-	const filteredMedia = derived(
-		[mediaStore, searchQuery, sortFieldStore, sortDirectionStore, qualityFilter, showMultiFileOnly],
+	async function fetchMedia(id: string, type: 'movie' | 'show') {
+		if (!id || !type) return;
+		loadingStore.set(true);
+		errorStore.set(null);
+		try {
+			const params = new URLSearchParams({
+				type: type === 'show' ? '2' : '1',
+				includeExternalMedia: '1',
+				includePreferences: '1'
+			});
+			const response = await fetch(`/api/plex/library/sections/${id}/all?${params.toString()}`);
+
+			if (!response.ok) {
+				let errorMsg = 'Failed to fetch media';
+				try {
+					const errorData = await response.json();
+					errorMsg = errorData?.message || errorData?.error || errorMsg;
+				} catch (_) {}
+				if (response.status === 401) goto('/login');
+				throw new Error(`${errorMsg} (Status: ${response.status})`);
+			}
+			const data = await response.json();
+			mediaStore.set(data.MediaContainer.Metadata || []);
+		} catch (e: any) {
+			console.error('Failed to fetch media:', e);
+			errorStore.set(e.message || 'An error occurred fetching media.');
+			mediaStore.set([]);
+		} finally {
+			loadingStore.set(false);
+		}
+	}
+
+	async function fetchDetailedMedia(ratingKey: string) {
+		if (!ratingKey || $detailedMediaStore.has(ratingKey)) return;
+
+		try {
+			const params = new URLSearchParams({
+				includeExternalMedia: '1',
+				includePreferences: '1'
+			});
+			const response = await fetch(`/api/plex/library/metadata/${ratingKey}?${params.toString()}`);
+
+			if (!response.ok) {
+				console.warn(`Failed to fetch detailed metadata for ${ratingKey}: ${response.status}`);
+				return;
+			}
+			const data = await response.json();
+			if (data.MediaContainer.Metadata && data.MediaContainer.Metadata.length > 0) {
+				detailedMediaStore.update((map) => {
+					map.set(ratingKey, data.MediaContainer.Metadata[0]);
+					return map;
+				});
+			}
+		} catch (e) {
+			console.error(`Error fetching detailed metadata for ${ratingKey}:`, e);
+		}
+	}
+
+	const filteredAndSortedMedia: Readable<PlexItem[]> = derived(
+		[
+			mediaStore,
+			detailedMediaStore,
+			searchQuery,
+			qualityFilter,
+			showMultiFileOnly,
+			sortFieldStore,
+			sortDirectionStore,
+			allSizesStore,
+			allOverallBitratesStore,
+			allVideoBitratesStore
+		],
 		([
 			$mediaStore,
+			$detailedMediaStore,
 			$searchQuery,
+			$qualityFilter,
+			$showMultiFileOnly,
 			$sortField,
 			$sortDirection,
-			$qualityFilter,
-			$showMultiFileOnly
+			$allSizes,
+			$allOverallBitrates,
+			$allVideoBitrates
 		]) => {
-			// Start with the original media list from the store
-			let result = $mediaStore; // Use $mediaStore here
+			let result = $mediaStore || [];
 
-			// Apply search filter if there's a query
-			if ($searchQuery) {
-				result = result.filter((item) => {
-					const searchLower = $searchQuery.toLowerCase();
-					return (
-						item.title.toLowerCase().includes(searchLower) ||
-						(item.originalTitle || '').toLowerCase().includes(searchLower)
+			// --- Pre-calculate percentiles if quality filter is active ---
+			let overallBitratePercentiles = new Map<string, number>();
+			if ($qualityFilter && $allOverallBitrates.length > 0) {
+				result.forEach((item) => {
+					const overallBitrate = item.Media?.[0]?.bitrate || 0;
+					overallBitratePercentiles.set(
+						item.ratingKey,
+						calculatePercentile(overallBitrate, $allOverallBitrates)
 					);
 				});
 			}
+			// -----------------------------------------------------------
 
-			// Apply quality filter if selected
+			if ($searchQuery) {
+				const query = $searchQuery.toLowerCase();
+				result = result.filter(
+					(item: PlexItem) =>
+						item.title?.toLowerCase().includes(query) ||
+						item.originalTitle?.toLowerCase().includes(query)
+				);
+			}
+
 			if ($qualityFilter) {
-				// IMPORTANT: Need to filter based on the *original* store value,
-				// not the potentially already search-filtered 'result'
-				// Or, chain the filters correctly. Let's chain them.
-				result = result.filter((item) => {
-					// Filter the current result set
-					const mediaInfo = item.Media?.[0];
-					if (!mediaInfo) return false;
-
-					const size = mediaInfo.Part?.[0]?.size || 0;
-					const bitrate = mediaInfo.bitrate || 0;
-					const { overallBitratePercentile } = getPercentiles(size, bitrate);
-
+				result = result.filter((item: PlexItem) => {
+					const overallBitratePercentile = overallBitratePercentiles.get(item.ratingKey) || 0;
 					switch ($qualityFilter) {
-						case '90p+':
+						case '90p':
 							return overallBitratePercentile >= 90;
-						case '75-89p':
+						case '75p':
 							return overallBitratePercentile >= 75 && overallBitratePercentile < 90;
-						case '50-74p':
+						case '50p':
 							return overallBitratePercentile >= 50 && overallBitratePercentile < 75;
-						case '25-49p':
+						case '25p':
 							return overallBitratePercentile >= 25 && overallBitratePercentile < 50;
 						case '<25p':
 							return overallBitratePercentile < 25;
@@ -211,40 +229,34 @@
 				});
 			}
 
-			// Apply multi-file filter if selected
 			if ($showMultiFileOnly) {
-				// IMPORTANT: Same as above, filter the current result set
-				result = result.filter((item) => {
-					// Filter the current result set
-					return item.Media && item.Media.length > 1;
-				});
+				result = result.filter((item: PlexItem) => item.Media && item.Media.length > 1);
 			}
 
-			// Then sort the filtered results
-			return [...result].sort((a, b) => {
+			return [...result].sort((a: PlexItem, b: PlexItem) => {
 				let aVal: any;
 				let bVal: any;
+
+				const aDetailed = $detailedMediaStore.get(a.ratingKey);
+				const bDetailed = $detailedMediaStore.get(b.ratingKey);
 
 				switch ($sortField) {
 					case 'overallBitrate':
 						aVal = a.Media?.[0]?.bitrate || 0;
 						bVal = b.Media?.[0]?.bitrate || 0;
 						break;
-					case 'videoBitrate': {
-						const aDetailed = detailedMedia.get(a.ratingKey);
-						const bDetailed = detailedMedia.get(b.ratingKey);
-						aVal =
-							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
-								?.bitrate ||
-							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
-							0;
-						bVal =
-							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
-								?.bitrate ||
-							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
-							0;
+					case 'videoBitrate':
+						aVal = getVideoBitrate(aDetailed || a);
+						bVal = getVideoBitrate(bDetailed || b);
 						break;
-					}
+					case 'fileSize':
+						aVal = a.Media?.[0]?.Part?.[0]?.size || 0;
+						bVal = b.Media?.[0]?.Part?.[0]?.size || 0;
+						break;
+					case 'addedAt':
+						aVal = a.addedAt || 0;
+						bVal = b.addedAt || 0;
+						break;
 					case 'originallyAvailableAt':
 						aVal = a.originallyAvailableAt || '';
 						bVal = b.originallyAvailableAt || '';
@@ -261,146 +273,118 @@
 				if (typeof aVal === 'number' && typeof bVal === 'number') {
 					return $sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
 				}
-				return $sortDirection === 'asc'
-					? aVal.toString().localeCompare(bVal.toString())
-					: bVal.toString().localeCompare(aVal.toString());
+				if (typeof aVal === 'string' && typeof bVal === 'string') {
+					return $sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+				}
+				return 0;
 			});
 		}
 	);
 
-	let detailedMedia = new Map<string, any>(); // Store detailed info by ratingKey
+	onMount(() => {
+		fetchLibraries();
 
-	// Modify fetchMedia to accept id and type
-	async function fetchMedia(id: string, type: 'movie' | 'show') {
-		// Set loading state (might be redundant if called from reactive block, but safe)
-		loading = true;
-		error = null;
+		const unsubscribeDerived = derived(
+			[searchQuery, qualityFilter, showMultiFileOnly, sortFieldStore, sortDirectionStore],
+			([$search, $quality, $multi, $sort, $direction]) => {
+				const currentUrl = new URL(window.location.href);
+				const params = currentUrl.searchParams;
 
-		const token = localStorage.getItem('plexToken');
-		const clientId = localStorage.getItem('plexClientId');
-		const serverUrl = localStorage.getItem('plexServerUrl');
+				const updateParam = (key: string, value: string | null | boolean, defaultValue?: any) => {
+					if (value != null && value !== false && value !== defaultValue) {
+						params.set(key, String(value));
+					} else {
+						params.delete(key);
+					}
+				};
 
-		if (!token || !clientId || !serverUrl) {
-			goto('/login');
-			loading = false; // Ensure loading stops if redirecting
-			return;
-		}
+				updateParam('search', $search, '');
+				updateParam('quality', $quality, null);
+				updateParam('multifile', $multi, false);
+				updateParam('sort', $sort, 'addedAt');
+				updateParam('direction', $direction, 'desc');
 
-		const headers = {
-			Accept: 'application/json',
-			'X-Plex-Token': token,
-			'X-Plex-Client-Identifier': clientId,
-			'X-Plex-Product': 'Plexman',
-			'X-Plex-Version': '1.0.0',
-			'X-Plex-Platform': 'Web',
-			'X-Plex-Platform-Version': '1.0.0',
-			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web'
+				if (currentUrl.search !== params.toString()) {
+					currentUrl.search = params.toString();
+					history.replaceState(null, '', currentUrl);
+				}
+			}
+		).subscribe(() => {});
+
+		const unsubscribePage = page.subscribe(($page) => {
+			const newLibraryId = $page.params.id;
+			const currentLibraryType = $librariesStore.find((lib) => lib.key === newLibraryId)?.type;
+			if (newLibraryId && currentLibraryType) {
+				fetchMedia(newLibraryId, currentLibraryType);
+			}
+		});
+
+		return () => {
+			unsubscribeDerived();
+			unsubscribePage();
+			clearTimeout(searchTimeout);
 		};
+	});
 
-		try {
-			// Use passed id and type
-			const response = await fetch(
-				`${serverUrl}/library/sections/${id}/all?` +
-					new URLSearchParams({
-						type: type === 'show' ? '2' : '1',
-						includeExternalMedia: '1',
-						includePreferences: '1',
-						checkFiles: '1', // Consider if these params are needed every time
-						asyncCheckFiles: '0'
-						// Filter/sort params from stores - Note: derived stores ($store) cannot be used directly here
-						// You might need to pass these as arguments too, or fetch unfiltered and rely on client-side filtering
-						// For now, removing server-side filtering based on stores from fetchMedia
-						// ...($qualityFilter ? { 'label!': $qualityFilter } : {}),
-						// ...($showMultiFileOnly ? { 'Media.Part>': '1' } : {}),
-						// ...($searchQuery ? { title: $searchQuery } : {})
-					}),
-				{ headers }
-			);
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch media');
-			}
-
-			const data = await response.json();
-			// Assign fetched data to the store
-			mediaStore.set(data.MediaContainer.Metadata || []);
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'An error occurred';
-			mediaStore.set([]); // Clear media store on error
-			if (error.includes('X-Plex-Token is missing') || error.includes('invalid')) {
-				localStorage.removeItem('plexToken');
-				goto('/login');
-			}
-		} finally {
-			loading = false;
-		}
+	$: if (libraryId && libraryType) {
+		fetchMedia(libraryId, libraryType);
 	}
 
-	// fetchLibraries remains the same, just fetches libraries
-	async function fetchLibraries() {
-		const token = localStorage.getItem('plexToken');
-		const clientId = localStorage.getItem('plexClientId');
-		const serverUrl = localStorage.getItem('plexServerUrl');
-
-		if (!token || !clientId || !serverUrl) {
-			// Don't goto login here, might interfere with initial load
-			console.error('Auth details missing for fetchLibraries');
-			error = 'Authentication details missing.';
-			libraries = []; // Ensure libraries is empty
-			loading = false;
-			return;
-		}
-
-		const headers = {
-			Accept: 'application/json',
-			'X-Plex-Token': token,
-			'X-Plex-Client-Identifier': clientId,
-			'X-Plex-Product': 'Plexman',
-			'X-Plex-Version': '1.0.0',
-			'X-Plex-Platform': 'Web',
-			'X-Plex-Platform-Version': '1.0.0',
-			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web'
-		};
-
-		try {
-			const response = await fetch(`${serverUrl}/library/sections`, { headers });
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch libraries');
-			}
-			const data = await response.json();
-			libraries = data.MediaContainer.Directory || [];
-		} catch (e) {
-			console.error('Failed to fetch libraries:', e);
-			error = e instanceof Error ? e.message : 'Failed to load libraries.';
-			libraries = []; // Ensure libraries is empty on error
-			loading = false; // Stop loading if libraries fail
-		}
+	function debounceSearch(value: string) {
+		clearTimeout(searchTimeout);
+		searchTimeout = setTimeout(() => {
+			searchQuery.set(value);
+		}, 300);
 	}
 
 	function handleSort(field: string) {
-		if (sortField === field) {
-			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-			sortDirectionStore.set(sortDirection);
+		const currentSort = $sortFieldStore;
+		const currentDirection = $sortDirectionStore;
+		if (currentSort === field) {
+			const newDirection = currentDirection === 'asc' ? 'desc' : 'asc';
+			sortDirectionStore.set(newDirection);
 		} else {
-			sortField = field;
 			sortFieldStore.set(field);
-			sortDirection = 'asc';
-			sortDirectionStore.set('asc');
+			sortDirectionStore.set('desc');
 		}
 	}
 
-	function formatDuration(ms: number): string {
-		const hours = Math.floor(ms / 3600000);
-		const minutes = Math.floor((ms % 3600000) / 60000);
-		const seconds = Math.floor((ms % 60000) / 1000);
-		return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+	function calculatePercentile(value: number, allValues: number[]): number {
+		if (allValues.length === 0 || value === 0) return 0;
+		const sorted = [...allValues].sort((a, b) => a - b);
+		let count = 0;
+		for (const v of sorted) {
+			if (v <= value) {
+				count++;
+			} else {
+				break;
+			}
+		}
+		return Math.round((count / sorted.length) * 100);
 	}
 
-	function formatFileSize(bytes: number): string {
+	function getVideoBitrate(item: PlexItem | null | undefined): number {
+		return (
+			item?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate || 0
+		);
+	}
+
+	function formatDurationSimple(ms: number): string {
+		if (!ms || ms <= 0) return '00:00';
+		const totalSeconds = Math.floor(ms / 1000);
+		const hours = Math.floor(totalSeconds / 3600);
+		const minutes = Math.floor((totalSeconds % 3600) / 60);
+		const seconds = totalSeconds % 60;
+		let result = '';
+		if (hours > 0) {
+			result += `${hours.toString().padStart(2, '0')}:`;
+		}
+		result += `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+		return result;
+	}
+
+	function formatFileSizeSimple(bytes: number): string {
+		if (!bytes || bytes <= 0) return '0 B';
 		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
 		let size = bytes;
 		let unitIndex = 0;
@@ -408,314 +392,192 @@
 			size /= 1024;
 			unitIndex++;
 		}
-		return `${size.toFixed(2)} ${units[unitIndex]}`;
+		return `${size.toFixed(unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`;
 	}
 
-	function calculatePercentile(value: number, allValues: number[]): number {
-		if (allValues.length === 0) return 0;
-		const sorted = [...allValues].sort((a, b) => a - b);
-		const index = sorted.indexOf(value);
-		return Math.round((index / (sorted.length - 1)) * 100);
-	}
+	const SORT_OPTIONS = [
+		{ label: 'Added ↓', field: 'addedAt', direction: 'desc' },
+		{ label: 'Added ↑', field: 'addedAt', direction: 'asc' },
+		{ label: 'Released ↓', field: 'originallyAvailableAt', direction: 'desc' },
+		{ label: 'Released ↑', field: 'originallyAvailableAt', direction: 'asc' },
+		{ label: 'Title A-Z', field: 'title', direction: 'asc' },
+		{ label: 'Title Z-A', field: 'title', direction: 'desc' },
+		{ label: 'Size ↓', field: 'fileSize', direction: 'desc' },
+		{ label: 'Size ↑', field: 'fileSize', direction: 'asc' },
+		{ label: 'Bitrate ↓', field: 'overallBitrate', direction: 'desc' },
+		{ label: 'Bitrate ↑', field: 'overallBitrate', direction: 'asc' }
+	];
 
-	// Calculate all sizes and bitrates for percentiles based on the store
-	$: allSizes = ($mediaStore || [])
-		.flatMap((item) => item.Media?.map((m: MediaItem) => m?.Part?.[0]?.size || 0) || [])
-		.filter((size) => size > 0);
-	$: allOverallBitrates = ($mediaStore || [])
-		.flatMap((item) => item.Media?.map((m: MediaItem) => m?.bitrate || 0) || [])
-		.filter((br) => br > 0);
-	$: allVideoBitrates = ($mediaStore || [])
-		.flatMap((item) =>
-			($mediaStore || []) // Use $mediaStore here too for consistency
-				.flatMap(
-					(item) =>
-						item.Media?.map((m: MediaItem) => {
-							const detailed = detailedMedia.get(item.ratingKey);
-							return (
-								detailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)
-									?.bitrate ||
-								m?.Part?.[0]?.Stream?.find((s: Stream) => s.streamType === 1)?.bitrate ||
-								0
-							);
-						}) || []
-				)
-				.filter((br) => br > 0)
-		)
-		.filter((br) => br > 0);
-
-	function getPercentiles(size: number, overallBitrate: number) {
-		return {
-			sizePercentile: calculatePercentile(size, allSizes),
-			overallBitratePercentile: calculatePercentile(overallBitrate, allOverallBitrates)
-		};
-	}
-
-	function formatBitrate(bitrate: number): string {
-		// Find item in the store
-		const item = ($mediaStore || []).find((m) => m.Media?.[0]?.bitrate === bitrate);
-		if (!item) return `${bitrate} Kbps`;
-
-		const mediaInfo = item.Media?.[0];
-		if (!mediaInfo) return `${bitrate} Kbps`;
-
-		const streams = mediaInfo.Part?.[0]?.Stream;
-		if (!streams) return `${bitrate} Kbps`;
-
-		// Get video stream bitrate directly from API
-		const videoStream = streams.find((s: Stream) => s.streamType === 1);
-		if (videoStream?.bitrate) {
-			return `${videoStream.bitrate} Kbps`;
-		}
-
-		// If no video stream bitrate, return total
-		return `${bitrate} Kbps`;
-	}
-
-	async function debugMovie(movie: any) {
-		const token = localStorage.getItem('plexToken');
-		const clientId = localStorage.getItem('plexClientId');
-		const serverUrl = localStorage.getItem('plexServerUrl');
-
-		if (!token || !clientId || !serverUrl) return;
-
-		const headers = {
-			Accept: 'application/json',
-			'X-Plex-Token': token,
-			'X-Plex-Client-Identifier': clientId,
-			'X-Plex-Product': 'Plexman',
-			'X-Plex-Version': '1.0.0',
-			'X-Plex-Platform': 'Web',
-			'X-Plex-Platform-Version': '1.0.0',
-			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web',
-			'X-Plex-Features': 'external-media,indirect-media,hub-style-list',
-			'X-Plex-Language': 'en',
-			'X-Plex-Provider-Version': '7.2'
-		};
-
-		try {
-			const response = await fetch(
-				`${serverUrl}/library/metadata/${movie.ratingKey}?` +
-					new URLSearchParams({
-						includeExternalMedia: '1',
-						includePreferences: '1',
-						checkFiles: '1',
-						asyncCheckFiles: '0'
-					}),
-				{ headers }
-			);
-
-			if (!response.ok) return;
-
-			const data = await response.json();
-			const item = data.MediaContainer.Metadata[0];
-			detailedMedia.set(movie.ratingKey, item);
-			detailedMedia = detailedMedia; // Trigger reactivity
-		} catch (e) {
-			console.error('Failed to fetch detailed metadata:', e);
-		}
-	}
-
-	function handleLogout() {
-		localStorage.removeItem('plexToken');
-		localStorage.removeItem('plexClientId');
-		goto('/login');
-	}
-
-	function handleSortSelect(event: Event) {
-		const select = event.target as HTMLSelectElement;
-		const option = SORT_OPTIONS[select.selectedIndex];
-		sortField = option.field;
-		sortDirection = option.direction;
-		sortFieldStore.set(option.field);
-		sortDirectionStore.set(option.direction);
-	}
+	const QUALITY_FILTERS = [
+		{ label: 'All Qualities', value: null },
+		{ label: 'Top 10% (>=90p)', value: '90p' },
+		{ label: '75p - 89p', value: '75p' },
+		{ label: '50p - 74p', value: '50p' },
+		{ label: '25p - 49p', value: '25p' },
+		{ label: '<25p', value: '<25p' }
+	];
 </script>
 
-<div class="min-h-screen bg-gray-100">
-	<Header {libraries} />
+<svelte:head>
+	<title>{$librariesStore.find((l) => l.key === libraryId)?.title || 'Library'} - Plexman</title>
+</svelte:head>
 
-	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-		{#if loading}
+<div class="min-h-screen bg-gray-100">
+	<Header libraries={$librariesStore} />
+
+	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6">
+		{#if $loadingStore}
 			<div class="flex justify-center items-center h-64">
 				<div
-					class="w-16 h-16 border-t-4 border-orange-500 border-solid rounded-full animate-spin"
+					class="w-12 h-12 border-t-4 border-orange-500 border-solid rounded-full animate-spin"
 				></div>
 			</div>
-		{:else if error}
-			<div class="bg-red-50 p-4 rounded-md">
-				<div class="flex">
-					<div class="flex-shrink-0">
-						<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-					</div>
-					<div class="ml-3">
-						<h3 class="text-sm font-medium text-red-800">Error loading media</h3>
-						<div class="mt-2 text-sm text-red-700">{error}</div>
-					</div>
-				</div>
+		{:else if $errorStore}
+			<div
+				class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+				role="alert"
+			>
+				<strong class="font-bold">Error!</strong>
+				<span class="block sm:inline">{$errorStore}</span>
 			</div>
 		{:else}
-			<div class="mb-4 flex items-center justify-between">
-				<div class="flex items-center space-x-4">
+			<div class="mb-4 p-3 bg-white shadow rounded-lg flex flex-wrap items-center gap-3">
+				<div class="relative flex-grow max-w-xs">
 					<input
-						type="text"
-						placeholder="Search movies..."
-						bind:value={$searchQuery}
-						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
+						type="search"
+						placeholder="Search title..."
+						bind:value={searchInput}
+						on:input={(e) => debounceSearch(e.currentTarget.value)}
+						class="block w-full pl-3 pr-3 py-1.5 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
 					/>
-					<select
-						on:change={handleSortSelect}
-						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
-					>
-						{#each SORT_OPTIONS as option}
-							<option selected={sortField === option.field && sortDirection === option.direction}>
-								{option.label}
-							</option>
-						{/each}
-					</select>
-					<a
-						href="/library/{libraryId}/stats"
-						class="px-3 py-1.5 text-sm font-medium rounded-md bg-orange-500 text-white hover:bg-orange-600"
-					>
-						View Stats
-					</a>
 				</div>
+				<select
+					bind:value={$sortFieldStore}
+					on:change={(e) => handleSort(e.currentTarget.value)}
+					class="text-sm border-gray-300 rounded-md shadow-sm focus:border-orange-300 focus:ring focus:ring-orange-200 focus:ring-opacity-50"
+				>
+					{#each SORT_OPTIONS as option}
+						<option value={option.field}>{option.label}</option>
+					{/each}
+				</select>
+				<button
+					on:click={() => sortDirectionStore.update((d) => (d === 'asc' ? 'desc' : 'asc'))}
+					class="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50"
+					title="Toggle Sort Direction"
+				>
+					{#if $sortDirectionStore === 'asc'}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"
+							/></svg
+						>
+					{:else}
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-4 w-4"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M3 4h13M3 8h9m-9 4h9m4-4l-4-4m0 0l-4 4m4-4v12m6 0h-4"
+							/></svg
+						>
+					{/if}
+				</button>
+				<select
+					bind:value={$qualityFilter}
+					class="text-sm border-gray-300 rounded-md shadow-sm focus:border-orange-300 focus:ring focus:ring-orange-200 focus:ring-opacity-50"
+				>
+					{#each QUALITY_FILTERS as filter}
+						<option value={filter.value}>{filter.label}</option>
+					{/each}
+				</select>
+				<label class="flex items-center space-x-2 text-sm">
+					<input
+						type="checkbox"
+						bind:checked={$showMultiFileOnly}
+						class="rounded border-gray-300 text-orange-600 shadow-sm focus:border-orange-300 focus:ring focus:ring-offset-0 focus:ring-orange-200 focus:ring-opacity-50"
+					/>
+					<span>Multiple Files Only</span>
+				</label>
+				<span class="text-sm text-gray-500 ml-auto"
+					>{$filteredAndSortedMedia.length} / {$mediaStore.length} items</span
+				>
 			</div>
 
-			<div class="mb-4 flex flex-wrap gap-2">
-				<button
-					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-					on:click={() => qualityFilter.update((v) => (v === '90p+' ? null : '90p+'))}
-				>
-					<span class="text-green-500">★★★★</span>
-				</button>
-				<button
-					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-					on:click={() => qualityFilter.update((v) => (v === '75-89p' ? null : '75-89p'))}
-				>
-					<span class="text-green-500">●●●●</span>
-				</button>
-				<button
-					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-					on:click={() => qualityFilter.update((v) => (v === '50-74p' ? null : '50-74p'))}
-				>
-					<span class="text-teal-500">●●●○</span>
-				</button>
-				<button
-					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-					on:click={() => qualityFilter.update((v) => (v === '25-49p' ? null : '25-49p'))}
-				>
-					<span class="text-orange-500">●●○○</span>
-				</button>
-				<button
-					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-					on:click={() => qualityFilter.update((v) => (v === '<25p' ? null : '<25p'))}
-				>
-					<span class="text-red-500">●○○○</span>
-				</button>
-				<button
-					class="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-700"
-					on:click={() => showMultiFileOnly.update((v) => !v)}
-				>
-					Multiple Files
-				</button>
-			</div>
-
-			{@const renderType = libraries.find((lib) => lib.key === libraryId)?.type}
-			{#if renderType === 'show'}
+			{#if libraryType === 'movie'}
+				<div class="bg-white shadow overflow-hidden sm:rounded-md">
+					<table class="min-w-full divide-y divide-gray-200">
+						<thead class="bg-gray-50">
+							<tr>
+								<th scope="col" class="w-16 px-1 py-2"></th>
+								<th
+									scope="col"
+									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>Title</th
+								>
+								<th
+									scope="col"
+									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>Year</th
+								>
+								<th
+									scope="col"
+									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>Size</th
+								>
+								<th
+									scope="col"
+									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>Bitrate (File/Vid)</th
+								>
+								<th
+									scope="col"
+									class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									>Quality (File/Vid)</th
+								>
+							</tr>
+						</thead>
+						<tbody class="bg-white divide-y divide-gray-200">
+							{#each $filteredAndSortedMedia as item (item.ratingKey)}
+								<MovieRow
+									{item}
+									detailedMedia={$detailedMediaStore}
+									onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
+									formatDuration={formatDurationSimple}
+									formatFileSize={formatFileSizeSimple}
+									allSizes={$allSizesStore}
+									allOverallBitrates={$allOverallBitratesStore}
+									calculatePercentileFn={calculatePercentile}
+								/>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{:else if libraryType === 'show'}
 				<div
-					class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2"
+					class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3"
 				>
-					{#each $filteredMedia as item (item.ratingKey)}
+					{#each $filteredAndSortedMedia as item (item.ratingKey)}
 						<ShowRow show={item} {libraryId} />
 					{/each}
 				</div>
-			{:else if renderType === 'movie'}
-				<div class="bg-white shadow-sm rounded-lg overflow-hidden">
-					<div class="overflow-x-auto">
-						<table class="min-w-full divide-y divide-gray-200">
-							<thead class="bg-gray-50">
-								<tr>
-									<th class="px-1 py-1 w-12"></th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>
-										Title ({$filteredMedia.length})
-									</th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
-									>
-										<button
-											type="button"
-											class="w-full text-left hover:bg-gray-100"
-											on:click={() => handleSort('year')}
-											on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
-										>
-											Year
-											{#if sortField === 'year'}
-												<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-											{/if}
-										</button>
-									</th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-									>
-										Duration
-									</th>
-									<th
-										class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-									>
-										<div class="flex items-center space-x-2">
-											<div class="w-14">Size</div>
-											<div class="w-24">Format</div>
-											<button
-												type="button"
-												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-												on:click={() => handleSort('overallBitrate')}
-												on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
-											>
-												Overall
-												{#if sortField === 'overallBitrate'}
-													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-												{/if}
-											</button>
-											<button
-												type="button"
-												class="w-14 cursor-pointer hover:bg-gray-100 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-												on:click={() => handleSort('videoBitrate')}
-												on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
-											>
-												Video
-												{#if sortField === 'videoBitrate'}
-													<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-												{/if}
-											</button>
-											<div class="w-14">Audio</div>
-										</div>
-									</th>
-								</tr>
-							</thead>
-							<tbody class="bg-white divide-y divide-gray-200">
-								{#each $filteredMedia as item (item.ratingKey)}
-									<MovieRow
-										{item}
-										{detailedMedia}
-										onDebug={debugMovie}
-										{formatDuration}
-										{formatFileSize}
-										{getPercentiles}
-									/>
-								{/each}
-							</tbody>
-						</table>
-					</div>
+			{/if}
+
+			{#if $filteredAndSortedMedia.length === 0 && $mediaStore.length > 0}
+				<div class="text-center py-12">
+					<p class="text-sm text-gray-500">No items match your current filters.</p>
 				</div>
 			{/if}
 		{/if}

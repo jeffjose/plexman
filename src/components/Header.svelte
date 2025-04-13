@@ -1,12 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { enhance } from '$app/forms';
 	export let libraries: any[] = [];
-
-	function handleLogout() {
-		localStorage.removeItem('plexToken');
-		localStorage.removeItem('plexClientId');
-		goto('/login');
-	}
 </script>
 
 <nav class="bg-white shadow-sm">
@@ -16,10 +11,10 @@
 				<a href="/" class="text-2xl font-bold text-gray-900 hover:text-orange-600 transition-colors"
 					>Plexman</a
 				>
-				<div class="flex items-center space-x-4">
+				<div class="hidden sm:flex items-center space-x-4">
 					{#each libraries as library}
 						<a
-							href="/library/{library.key}?type={library.type}"
+							href="/library/{library.key}"
 							class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-100 text-gray-700"
 						>
 							<svg
@@ -47,7 +42,7 @@
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										stroke-width="2"
-										d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+										d="M8 7v8a2 2 0 002 2h4M8 7a2 2 0 012-2h4a2 2 0 012 2v8a2 2 0 01-2 2h-4a2 2 0 01-2-2z"
 									/>
 								{/if}
 							</svg>
@@ -57,12 +52,14 @@
 				</div>
 			</div>
 			<div class="flex items-center">
-				<button
-					on:click={handleLogout}
-					class="ml-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-				>
-					Logout
-				</button>
+				<form action="/logout" method="POST" use:enhance>
+					<button
+						type="submit"
+						class="ml-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-orange-700 bg-orange-100 hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+					>
+						Logout
+					</button>
+				</form>
 			</div>
 		</div>
 	</div>

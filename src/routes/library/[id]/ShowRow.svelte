@@ -2,7 +2,7 @@
 	export let show: any;
 	export let libraryId: string;
 
-	$: posterUrl = `${localStorage.getItem('plexServerUrl')}${show.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`;
+	$: posterUrl = show.thumb ? `/api/plex-image${show.thumb}` : '';
 </script>
 
 <a

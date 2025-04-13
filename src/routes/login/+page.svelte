@@ -10,7 +10,8 @@
 
 			// Generate a random identifier for this client
 			const identifier = Math.random().toString(36).substring(2, 15);
-			localStorage.setItem('plexClientId', identifier);
+			// Store as a temporary cookie (accessible by client-side JS)
+			document.cookie = `plexClientId=${identifier}; path=/; max-age=600; SameSite=Lax`; // Expires in 10 mins
 
 			// First get a PIN from Plex
 			const pinResponse = await fetch('https://plex.tv/api/v2/pins', {
@@ -30,7 +31,8 @@
 			}
 
 			const pinData = await pinResponse.json();
-			localStorage.setItem('plexPinId', pinData.id.toString());
+			// Store PIN ID as a temporary cookie
+			document.cookie = `plexPinId=${pinData.id.toString()}; path=/; max-age=600; SameSite=Lax`; // Expires in 10 mins
 
 			// Construct auth URL with the PIN code
 			const params = new URLSearchParams({

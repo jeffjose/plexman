@@ -3,16 +3,12 @@
 
 	export let item: any;
 	export let detailedMedia: Map<string, any>;
-	export let onDebug: (movie: any) => Promise<void>;
+	export let onDebug: (item: any) => Promise<void>;
 	export let formatDuration: (ms: number) => string;
 	export let formatFileSize: (bytes: number) => string;
-	export let getPercentiles: (
-		size: number,
-		overallBitrate: number
-	) => {
-		sizePercentile: number;
-		overallBitratePercentile: number;
-	};
+	export let allSizes: number[] = [];
+	export let allOverallBitrates: number[] = [];
+	export let calculatePercentileFn: (value: number, allValues: number[]) => number;
 
 	let rowElement: HTMLElement;
 	let observer: IntersectionObserver | null = null;
@@ -91,25 +87,34 @@
 	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''}"
 >
 	<td class="px-1 py-1">
-		<img
-			src={`${localStorage.getItem('plexServerUrl')}${item.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
-			alt={item.title}
-			class="w-12 h-16 object-cover rounded"
-			loading="lazy"
-			decoding="async"
-		/>
+		{#if item.thumb}
+			<img
+				src={`/api/plex-image${item.thumb}`}
+				alt={item.title}
+				class="w-12 h-16 object-cover rounded bg-gray-200"
+				loading="lazy"
+				decoding="async"
+			/>
+		{:else}
+			<div class="w-12 h-16 rounded bg-gray-200 flex items-center justify-center">
+				<svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24"
+					><path
+						d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"
+					/></svg
+				>
+			</div>
+		{/if}
 	</td>
 	<td class="px-2 py-1">
 		<div class="flex items-center space-x-2">
 			{#if item.Media?.[0]?.bitrate}
-				{@const percentiles = getPercentiles(
-					item.Media[0].Part?.[0]?.size || 0,
-					item.Media[0].bitrate
-				)}
-				<div class="flex -space-x-0.5" title="{percentiles.overallBitratePercentile}th percentile">
+				{@const size = item.Media[0].Part?.[0]?.size || 0}
+				{@const bitrate = item.Media[0].bitrate}
+				{@const bitratePercentile = calculatePercentileFn(bitrate, allOverallBitrates)}
+				<div class="flex -space-x-0.5" title="{bitratePercentile}th percentile">
 					{#each Array(4) as _, i}
 						<div class="w-3 h-3 flex items-center justify-center">
-							{#if percentiles.overallBitratePercentile >= 90}
+							{#if bitratePercentile >= 90}
 								<svg
 									class="w-3.5 h-3.5 text-green-500"
 									fill="currentColor"
@@ -122,13 +127,13 @@
 								</svg>
 							{:else}
 								<svg
-									class="w-2.5 h-2.5 {percentiles.overallBitratePercentile >= 75
+									class="w-2.5 h-2.5 {bitratePercentile >= 75
 										? 'text-green-500'
-										: percentiles.overallBitratePercentile >= 50
+										: bitratePercentile >= 50
 											? i <= 2
 												? 'text-teal-500'
 												: 'text-gray-200'
-											: percentiles.overallBitratePercentile >= 25
+											: bitratePercentile >= 25
 												? i <= 1
 													? 'text-orange-500'
 													: 'text-gray-200'
@@ -169,13 +174,17 @@
 				{@const size = mediaItem?.Part?.[0]?.size || 0}
 				{@const overallBitrate = getBitrate(mediaItem, 0)}
 				{@const videoBitrate = getBitrate(mediaItem, 1)}
-				{@const percentiles = getPercentiles(size, overallBitrate)}
+				{@const sizePercentile = calculatePercentileFn(size, allSizes)}
+				{@const overallBitratePercentile = calculatePercentileFn(
+					overallBitrate,
+					allOverallBitrates
+				)}
 				<div
 					class="flex items-center space-x-2 {i > 0 ? 'mt-1 pt-1 border-t border-gray-100' : ''}"
 				>
-					<div class="text-xs w-14 {getPercentileColor(percentiles.sizePercentile)}">
+					<div class="text-xs w-14 {getPercentileColor(sizePercentile)}">
 						{formatFileSize(size)}
-						<span class="opacity-75">({percentiles.sizePercentile}p)</span>
+						<span class="opacity-75">({sizePercentile}p)</span>
 					</div>
 					<div class="flex space-x-1">
 						<span
@@ -189,9 +198,9 @@
 							{getResolution(mediaItem)}
 						</span>
 					</div>
-					<div class="text-xs w-14 {getPercentileColor(percentiles.overallBitratePercentile)}">
+					<div class="text-xs w-14 {getPercentileColor(overallBitratePercentile)}">
 						{overallBitrate}k
-						<span class="opacity-75">({percentiles.overallBitratePercentile}p)</span>
+						<span class="opacity-75">({overallBitratePercentile}p)</span>
 					</div>
 					<div class="text-xs text-gray-500 w-14">
 						{videoBitrate}k

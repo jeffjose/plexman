@@ -6,242 +6,61 @@
 	import MovieRow from '../../MovieRow.svelte';
 	import Header from '../../../../../components/Header.svelte';
 
-	let show: any = null;
-	let episodes: any[] = [];
+	// --- Interfaces ---
+	interface Stream {
+		streamType: number;
+		codec?: string;
+		bitrate?: number;
+		channels?: number;
+		height?: number;
+		[key: string]: any;
+	}
+
+	interface PlexItem {
+		// Define needed properties for show and episode
+		ratingKey: string;
+		title: string;
+		[key: string]: any; // Allow other properties
+	}
+
+	// --- State ---
+	let show: PlexItem | null = null;
+	let episodes: PlexItem[] = [];
 	let loading = true;
 	let error: string | null = null;
-	let sortField = 'originallyAvailableAt';
-	let sortDirection = 'asc';
-	let observers = new Map();
 	let libraries: any[] = [];
+	let detailedMedia = writable<Map<string, any>>(new Map()); // Use writable store
+	let observers = new Map<string, IntersectionObserver>();
 
+	// --- Filtering/Sorting State ---
 	const searchQuery = writable('');
-	const sortFieldStore = writable(sortField);
-	const sortDirectionStore = writable(sortDirection);
+	const sortFieldStore = writable('index'); // Default sort for episodes
+	const sortDirectionStore = writable('asc');
 	let searchInput = '';
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
-	function handleLogout() {
-		localStorage.removeItem('plexToken');
-		localStorage.removeItem('plexClientId');
-		goto('/login');
-	}
+	// --- Reactive ---
+	$: libraryId = $page.params.id;
+	$: showId = $page.params.showId;
 
+	// --- Helper Functions ---
 	function debounceSearch(value: string) {
 		clearTimeout(searchTimeout);
 		searchTimeout = setTimeout(() => {
 			searchQuery.set(value);
-		}, 250);
-	}
-
-	$: libraryId = $page.params.id;
-	$: showId = $page.params.showId;
-
-	async function fetchLibraries() {
-		const token = localStorage.getItem('plexToken');
-		const clientId = localStorage.getItem('plexClientId');
-		const serverUrl = localStorage.getItem('plexServerUrl');
-
-		if (!token || !clientId || !serverUrl) return;
-
-		const headers = {
-			Accept: 'application/json',
-			'X-Plex-Token': token,
-			'X-Plex-Client-Identifier': clientId,
-			'X-Plex-Product': 'Plexman',
-			'X-Plex-Version': '1.0.0',
-			'X-Plex-Platform': 'Web',
-			'X-Plex-Platform-Version': '1.0.0',
-			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web'
-		};
-
-		try {
-			const response = await fetch(`${serverUrl}/library/sections`, { headers });
-			if (!response.ok) return;
-			const data = await response.json();
-			libraries = data.MediaContainer.Directory;
-		} catch (e) {
-			console.error('Failed to fetch libraries:', e);
-		}
-	}
-
-	$: movieLibrary = libraries.find((lib) => lib.type === 'movie')?.key;
-	$: showLibrary = libraries.find((lib) => lib.type === 'show')?.key;
-
-	const filteredEpisodes = derived(
-		[searchQuery, sortFieldStore, sortDirectionStore],
-		([$searchQuery, $sortField, $sortDirection]) => {
-			// First filter the episodes
-			let result = !$searchQuery
-				? episodes
-				: episodes.filter(
-						(item) =>
-							item.title.toLowerCase().includes($searchQuery.toLowerCase()) ||
-							`S${item.parentIndex}E${item.index}`
-								.toLowerCase()
-								.includes($searchQuery.toLowerCase())
-					);
-
-			// Then sort the filtered results
-			return [...result].sort((a, b) => {
-				let aVal: any;
-				let bVal: any;
-
-				switch ($sortField) {
-					case 'overallBitrate':
-						aVal = a.Media?.[0]?.bitrate || 0;
-						bVal = b.Media?.[0]?.bitrate || 0;
-						break;
-					case 'videoBitrate': {
-						const aDetailed = detailedMedia.get(a.ratingKey);
-						const bDetailed = detailedMedia.get(b.ratingKey);
-						aVal =
-							aDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
-								?.bitrate ||
-							a.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
-							0;
-						bVal =
-							bDetailed?.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)
-								?.bitrate ||
-							b.Media?.[0]?.Part?.[0]?.Stream?.find((s: any) => s.streamType === 1)?.bitrate ||
-							0;
-						break;
-					}
-					case 'originallyAvailableAt':
-						aVal = a.originallyAvailableAt || '';
-						bVal = b.originallyAvailableAt || '';
-						break;
-					default:
-						aVal = a[$sortField] || '';
-						bVal = b[$sortField] || '';
-				}
-
-				if (typeof aVal === 'number' && typeof bVal === 'number') {
-					return $sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
-				}
-				return $sortDirection === 'asc'
-					? aVal.toString().localeCompare(bVal.toString())
-					: bVal.toString().localeCompare(aVal.toString());
-			});
-		}
-	);
-
-	let detailedMedia = new Map<string, any>();
-
-	function createObserver(episode: any) {
-		const observer = new IntersectionObserver(
-			(entries) => {
-				entries.forEach((entry) => {
-					if (entry.isIntersecting) {
-						debugEpisode(episode);
-						observer.disconnect();
-						observers.delete(episode.ratingKey);
-					}
-				});
-			},
-			{ threshold: 0.1 }
-		);
-		return observer;
-	}
-
-	function observeEpisode(element: HTMLElement, episode: any) {
-		if (!observers.has(episode.ratingKey)) {
-			const observer = createObserver(episode);
-			observers.set(episode.ratingKey, observer);
-			observer.observe(element);
-		}
-	}
-
-	async function fetchShow() {
-		const token = localStorage.getItem('plexToken');
-		const clientId = localStorage.getItem('plexClientId');
-		const serverUrl = localStorage.getItem('plexServerUrl');
-
-		if (!token || !clientId || !serverUrl) {
-			goto('/login');
-			return;
-		}
-
-		const headers = {
-			Accept: 'application/json',
-			'X-Plex-Token': token,
-			'X-Plex-Client-Identifier': clientId,
-			'X-Plex-Product': 'Plexman',
-			'X-Plex-Version': '1.0.0',
-			'X-Plex-Platform': 'Web',
-			'X-Plex-Platform-Version': '1.0.0',
-			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web'
-		};
-
-		try {
-			// First get the show details
-			const showResponse = await fetch(
-				`${serverUrl}/library/metadata/${showId}?includeChildren=1`,
-				{ headers }
-			);
-
-			if (!showResponse.ok) {
-				const errorData = await showResponse.json();
-				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch show');
-			}
-
-			const showData = await showResponse.json();
-			show = showData.MediaContainer.Metadata[0];
-
-			// Then get all episodes
-			const episodesResponse = await fetch(
-				`${serverUrl}/library/metadata/${showId}/allLeaves?` +
-					new URLSearchParams({
-						includeExternalMedia: '1',
-						includePreferences: '1',
-						checkFiles: '1',
-						asyncCheckFiles: '0'
-					}),
-				{ headers }
-			);
-
-			if (!episodesResponse.ok) {
-				const errorData = await episodesResponse.json();
-				throw new Error(errorData?.errors?.[0]?.message || 'Failed to fetch episodes');
-			}
-
-			const episodesData = await episodesResponse.json();
-			episodes = episodesData.MediaContainer.Metadata || [];
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'An error occurred';
-			if (error.includes('X-Plex-Token is missing') || error.includes('invalid')) {
-				localStorage.removeItem('plexToken');
-				goto('/login');
-			}
-		} finally {
-			loading = false;
-		}
-	}
-
-	function handleSort(field: string) {
-		if (sortField === field) {
-			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
-			sortDirectionStore.set(sortDirection);
-		} else {
-			sortField = field;
-			sortFieldStore.set(field);
-			sortDirection = 'asc';
-			sortDirectionStore.set('asc');
-		}
+		}, 300);
 	}
 
 	function formatDuration(ms: number): string {
+		if (!ms || ms <= 0) return '00:00:00';
 		const hours = Math.floor(ms / 3600000);
 		const minutes = Math.floor((ms % 3600000) / 60000);
 		const seconds = Math.floor((ms % 60000) / 1000);
-		return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds
-			.toString()
-			.padStart(2, '0')}`;
+		return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 	}
 
 	function formatFileSize(bytes: number): string {
+		if (!bytes || bytes <= 0) return '0 B';
 		const units = ['B', 'KB', 'MB', 'GB', 'TB'];
 		let size = bytes;
 		let unitIndex = 0;
@@ -249,310 +68,366 @@
 			size /= 1024;
 			unitIndex++;
 		}
-		return `${size.toFixed(2)} ${units[unitIndex]}`;
+		return `${size.toFixed(unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`;
 	}
 
-	function calculatePercentile(value: number, allValues: number[]): number {
-		if (allValues.length === 0) return 0;
-		const sorted = [...allValues].sort((a, b) => a - b);
-		const index = sorted.indexOf(value);
-		return Math.round((index / (sorted.length - 1)) * 100);
-	}
-
-	$: allSizes = episodes
-		.flatMap((item) => item.Media?.map((m: any) => m?.Part?.[0]?.size || 0) || [])
-		.filter((size) => size > 0);
-	$: allOverallBitrates = episodes
-		.flatMap((item) => item.Media?.map((m: any) => m?.bitrate || 0) || [])
-		.filter((br) => br > 0);
-
-	function getPercentiles(size: number, overallBitrate: number) {
-		return {
-			sizePercentile: calculatePercentile(size, allSizes),
-			overallBitratePercentile: calculatePercentile(overallBitrate, allOverallBitrates)
-		};
-	}
-
-	async function debugEpisode(episode: any) {
-		const token = localStorage.getItem('plexToken');
-		const clientId = localStorage.getItem('plexClientId');
-		const serverUrl = localStorage.getItem('plexServerUrl');
-
-		if (!token || !clientId || !serverUrl) return;
-
-		const headers = {
-			Accept: 'application/json',
-			'X-Plex-Token': token,
-			'X-Plex-Client-Identifier': clientId,
-			'X-Plex-Product': 'Plexman',
-			'X-Plex-Version': '1.0.0',
-			'X-Plex-Platform': 'Web',
-			'X-Plex-Platform-Version': '1.0.0',
-			'X-Plex-Device': 'Browser',
-			'X-Plex-Device-Name': 'Plexman Web'
-		};
-
+	// --- Data Fetching ---
+	async function fetchLibraries() {
 		try {
-			const response = await fetch(
-				`${serverUrl}/library/metadata/${episode.ratingKey}?` +
-					new URLSearchParams({
-						includeExternalMedia: '1',
-						includePreferences: '1',
-						checkFiles: '1',
-						asyncCheckFiles: '0'
-					}),
-				{ headers }
-			);
-
-			if (!response.ok) return;
-
+			const response = await fetch(`/api/plex/library/sections`);
+			if (!response.ok) {
+				console.warn(`Failed to fetch libraries for header: ${response.status}`);
+				return; // Don't throw, header might just be incomplete
+			}
 			const data = await response.json();
-			const item = data.MediaContainer.Metadata[0];
-			detailedMedia.set(episode.ratingKey, item);
-			detailedMedia = detailedMedia; // Trigger reactivity
+			libraries = data.MediaContainer.Directory || [];
 		} catch (e) {
-			console.error('Failed to fetch detailed metadata:', e);
+			console.error('Failed to fetch libraries:', e);
+			libraries = [];
 		}
 	}
 
+	async function fetchShowAndEpisodes() {
+		if (!showId) return;
+		loading = true;
+		error = null;
+		try {
+			// Fetch show details
+			const showResponse = await fetch(`/api/plex/library/metadata/${showId}?includeChildren=1`);
+			if (!showResponse.ok) {
+				let errorMsg = 'Failed to fetch show details';
+				try {
+					const errData = await showResponse.json();
+					errorMsg = errData?.message || errData?.error || errorMsg;
+				} catch (_) {}
+				if (showResponse.status === 401) goto('/login');
+				throw new Error(`${errorMsg} (Status: ${showResponse.status})`);
+			}
+			const showData = await showResponse.json();
+			show = showData.MediaContainer.Metadata[0];
+
+			// Fetch all episodes
+			const episodesParams = new URLSearchParams({
+				includeExternalMedia: '1'
+			});
+			const episodesResponse = await fetch(
+				`/api/plex/library/metadata/${showId}/allLeaves?${episodesParams.toString()}`
+			);
+			if (!episodesResponse.ok) {
+				let errorMsg = 'Failed to fetch episodes';
+				try {
+					const errData = await episodesResponse.json();
+					errorMsg = errData?.message || errData?.error || errorMsg;
+				} catch (_) {}
+				if (episodesResponse.status === 401) goto('/login');
+				throw new Error(`${errorMsg} (Status: ${episodesResponse.status})`);
+			}
+			const episodesData = await episodesResponse.json();
+			episodes = episodesData.MediaContainer.Metadata || [];
+		} catch (e: any) {
+			console.error('Failed to fetch show/episodes:', e);
+			episodes = [];
+			show = null;
+			error = e.message || 'An error occurred loading the show.';
+		} finally {
+			loading = false;
+		}
+	}
+
+	// Fetch detailed metadata for an episode when it becomes visible
+	async function fetchDetailedEpisode(episode: PlexItem) {
+		const ratingKey = episode.ratingKey;
+		if (!ratingKey || $detailedMedia.has(ratingKey)) return;
+
+		try {
+			const params = new URLSearchParams({
+				includeExternalMedia: '1'
+			});
+			const response = await fetch(`/api/plex/library/metadata/${ratingKey}?${params.toString()}`);
+			if (!response.ok) {
+				console.warn(
+					`Failed to fetch detailed metadata for episode ${ratingKey}: ${response.status}`
+				);
+				return;
+			}
+			const data = await response.json();
+			if (data.MediaContainer.Metadata && data.MediaContainer.Metadata.length > 0) {
+				detailedMedia.update((map) => {
+					map.set(ratingKey, data.MediaContainer.Metadata[0]);
+					return map;
+				});
+			}
+		} catch (e) {
+			console.error(`Error fetching detailed metadata for episode ${ratingKey}:`, e);
+		}
+	}
+
+	// --- Intersection Observer for lazy-loading detailed data ---
+	function createObserver(episode: PlexItem) {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (entry.isIntersecting) {
+						fetchDetailedEpisode(episode);
+						observer.unobserve(entry.target); // Stop observing once triggered
+						observers.delete(episode.ratingKey);
+					}
+				});
+			},
+			{ threshold: 0.1 } // Trigger when 10% visible
+		);
+		return observer;
+	}
+
+	function observeEpisode(element: HTMLElement, episode: PlexItem) {
+		if (!element || observers.has(episode.ratingKey)) return;
+
+		// Only observe if detailed data isn't already loading/loaded
+		if (!$detailedMedia.has(episode.ratingKey)) {
+			const observer = createObserver(episode);
+			observers.set(episode.ratingKey, observer);
+			observer.observe(element);
+			// console.log(`Observing episode: ${episode.title}`);
+		}
+	}
+
+	// --- Filtering & Sorting Episodes ---
+	const filteredAndSortedEpisodes = derived(
+		[writable(episodes), searchQuery, sortFieldStore, sortDirectionStore], // Use writable(episodes) to react to changes
+		([$episodes, $searchQuery, $sortField, $sortDirection]) => {
+			let result = $episodes || [];
+
+			if ($searchQuery) {
+				const query = $searchQuery.toLowerCase();
+				result = result.filter((ep) => ep.title?.toLowerCase().includes(query));
+			}
+
+			return [...result].sort((a, b) => {
+				let aVal: any;
+				let bVal: any;
+
+				switch ($sortField) {
+					case 'originallyAvailableAt':
+						aVal = a.originallyAvailableAt || '';
+						bVal = b.originallyAvailableAt || '';
+						break;
+					case 'index':
+						aVal = a.index || 0;
+						bVal = b.index || 0;
+						break;
+					case 'parentIndex': // Season number
+						aVal = a.parentIndex || 0;
+						bVal = b.parentIndex || 0;
+						// Secondary sort by episode index if seasons are the same
+						if (aVal === bVal) {
+							aVal = a.index || 0;
+							bVal = b.index || 0;
+							return $sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+						}
+						break;
+					default: // Title
+						aVal = a.title || '';
+						bVal = b.title || '';
+				}
+
+				if (typeof aVal === 'number' && typeof bVal === 'number') {
+					return $sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+				}
+				if (typeof aVal === 'string' && typeof bVal === 'string') {
+					return $sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+				}
+				return 0;
+			});
+		}
+	);
+
+	// --- Lifecycle ---
 	onMount(() => {
-		fetchShow();
 		fetchLibraries();
+		fetchShowAndEpisodes();
 		return () => {
 			// Cleanup observers on component unmount
 			observers.forEach((observer) => observer.disconnect());
 			observers.clear();
+			clearTimeout(searchTimeout);
 		};
 	});
+
+	function handleSort(field: string) {
+		if ($sortFieldStore === field) {
+			sortDirectionStore.update((d) => (d === 'asc' ? 'desc' : 'asc'));
+		} else {
+			sortFieldStore.set(field);
+			sortDirectionStore.set('asc'); // Default to asc for episodes maybe?
+		}
+	}
 </script>
+
+<svelte:head>
+	<title>{show?.title || 'Show Details'} - Plexman</title>
+</svelte:head>
 
 <div class="min-h-screen bg-gray-100">
 	<Header {libraries} />
 
-	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6">
 		{#if loading}
 			<div class="flex justify-center items-center h-64">
 				<div
-					class="w-16 h-16 border-t-4 border-orange-500 border-solid rounded-full animate-spin"
+					class="w-12 h-12 border-t-4 border-orange-500 border-solid rounded-full animate-spin"
 				></div>
 			</div>
 		{:else if error}
-			<div class="bg-red-50 p-4 rounded-md">
-				<div class="flex">
-					<div class="flex-shrink-0">
-						<svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-							<path
-								fill-rule="evenodd"
-								d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-								clip-rule="evenodd"
-							/>
-						</svg>
-					</div>
-					<div class="ml-3">
-						<h3 class="text-sm font-medium text-red-800">Error loading show</h3>
-						<div class="mt-2 text-sm text-red-700">{error}</div>
-					</div>
-				</div>
+			<div
+				class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
+				role="alert"
+			>
+				<strong class="font-bold">Error!</strong>
+				<span class="block sm:inline">{error}</span>
+			</div>
+		{:else if !show}
+			<div class="text-center py-12">
+				<p class="text-sm text-gray-500">Show not found or could not be loaded.</p>
 			</div>
 		{:else}
-			<div class="mb-2">
-				<div class="flex space-x-3">
-					<img
-						src={`${localStorage.getItem('plexServerUrl')}${show.thumb}?X-Plex-Token=${localStorage.getItem('plexToken')}`}
-						alt={show.title}
-						class="w-24 h-36 object-cover rounded"
-					/>
-					<div class="min-w-0">
-						<h1 class="text-lg font-medium text-gray-900 truncate">{show.title}</h1>
+			<!-- Show Header -->
+			<div class="mb-4 p-3 bg-white shadow rounded-lg">
+				<div class="flex flex-col sm:flex-row sm:space-x-4">
+					{#if show.thumb}
+						<img
+							src={`/api/plex-image${show.thumb}`}
+							alt={show.title}
+							class="w-32 h-48 sm:w-40 sm:h-60 object-cover rounded mx-auto sm:mx-0 mb-3 sm:mb-0 flex-shrink-0 bg-gray-200"
+							loading="lazy"
+						/>
+					{:else}
+						<div
+							class="w-32 h-48 sm:w-40 sm:h-60 rounded bg-gray-200 flex items-center justify-center mx-auto sm:mx-0 mb-3 sm:mb-0 flex-shrink-0"
+						>
+							<svg class="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+								<path
+									d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"
+								/>
+							</svg>
+						</div>
+					{/if}
+					<div class="min-w-0 flex-grow text-center sm:text-left">
+						<h1 class="text-xl sm:text-2xl font-bold text-gray-900 truncate">{show.title}</h1>
 						{#if show.originalTitle && show.originalTitle !== show.title}
 							<p class="text-sm text-gray-600 truncate">{show.originalTitle}</p>
 						{/if}
-						<div class="mt-1 flex items-center text-xs text-gray-500 space-x-2">
-							<span>{show.year}</span>
-							<span>•</span>
-							<span>{show.childCount} {show.childCount === 1 ? 'Season' : 'Seasons'}</span>
-							{#if show.leafCount}
-								<span>•</span>
-								<span>{show.leafCount} {show.leafCount === 1 ? 'Episode' : 'Episodes'}</span>
-							{/if}
+						<div
+							class="mt-1 flex flex-wrap items-center justify-center sm:justify-start text-xs text-gray-500 space-x-2"
+						>
+							{#if show.year}<span>{show.year}</span>{/if}
+							{#if show.year && show.childCount}<span>•</span>{/if}
+							{#if show.childCount}<span
+									>{show.childCount} {show.childCount === 1 ? 'Season' : 'Seasons'}</span
+								>{/if}
+							{#if show.leafCount && (show.year || show.childCount)}<span>•</span>{/if}
+							{#if show.leafCount}<span
+									>{show.leafCount} {show.leafCount === 1 ? 'Episode' : 'Episodes'}</span
+								>{/if}
 						</div>
+						{#if show.contentRating}<span
+								class="inline-block mt-1 px-1.5 py-0.5 text-xs font-medium border border-gray-400 text-gray-600 rounded"
+								>{show.contentRating}</span
+							>{/if}
+						{#if show.rating}<span class="inline-block mt-1 ml-2 text-xs text-yellow-600"
+								>★ {show.rating.toFixed(1)}</span
+							>{/if}
 						{#if show.summary}
-							<p class="mt-1 text-xs text-gray-600 line-clamp-2">{show.summary}</p>
+							<p class="mt-2 text-sm text-gray-600 line-clamp-4">{show.summary}</p>
 						{/if}
 					</div>
 				</div>
 			</div>
 
-			<div class="mb-4">
-				<div class="relative">
-					<input
-						type="text"
-						bind:value={searchInput}
-						on:input={() => debounceSearch(searchInput)}
-						placeholder="Search episodes..."
-						class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-					/>
-					{#if searchInput}
-						<button
-							on:click={() => {
-								searchInput = '';
-								searchQuery.set('');
-							}}
-							class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								class="h-5 w-5"
-								viewBox="0 0 20 20"
-								fill="currentColor"
-							>
-								<path
-									fill-rule="evenodd"
-									d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-									clip-rule="evenodd"
-								/>
-							</svg>
-						</button>
-					{/if}
-				</div>
+			<!-- Episode Filters -->
+			<div class="mb-4 p-2 bg-white shadow rounded-lg flex items-center gap-2">
+				<input
+					type="search"
+					placeholder="Search episodes..."
+					bind:value={searchInput}
+					on:input={(e) => debounceSearch(e.currentTarget.value)}
+					class="flex-grow block w-full pl-3 pr-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-orange-500 focus:border-orange-500"
+				/>
+				<!-- Add sort controls if needed -->
+				<span class="text-sm text-gray-500">{$filteredAndSortedEpisodes.length} episodes</span>
 			</div>
 
-			<div class="bg-white shadow-sm rounded-lg overflow-hidden">
-				<div class="overflow-x-auto">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
+			<!-- Episodes Table -->
+			<div class="bg-white shadow overflow-hidden sm:rounded-md">
+				<table class="min-w-full divide-y divide-gray-200">
+					<thead class="bg-gray-50">
+						<tr>
+							<th
+								scope="col"
+								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10"
+								>S/E</th
+							>
+							<th
+								scope="col"
+								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+								>Title</th
+							>
+							<th
+								scope="col"
+								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>Air Date</th
+							>
+							<th
+								scope="col"
+								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
+								>Size</th
+							>
+							<th
+								scope="col"
+								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
+								>Video</th
+							>
+							<th
+								scope="col"
+								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								>Audio</th
+							>
+						</tr>
+					</thead>
+					<tbody class="bg-white divide-y divide-gray-200">
+						{#each $filteredAndSortedEpisodes as episode (episode.ratingKey)}
+							{@const detail = $detailedMedia.get(episode.ratingKey)}
+							{@const media = detail?.Media?.[0] || episode.Media?.[0]}
+							{@const part = media?.Part?.[0]}
+							{@const video = part?.Stream?.find((s: Stream) => s.streamType === 1)}
+							{@const audio = part?.Stream?.find((s: Stream) => s.streamType === 2)}
+							<tr use:observeEpisode={episode} class="hover:bg-gray-50">
+								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
+									{episode.parentIndex?.toString().padStart(2, '0')}x{episode.index
+										?.toString()
+										.padStart(2, '0')}
+								</td>
+								<td
+									class="px-2 py-2 text-sm font-medium text-gray-900 truncate"
+									title={episode.title}
 								>
-									Episode
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+									{episode.title}
+								</td>
+								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500"
+									>{episode.originallyAvailableAt || '--'}</td
 								>
-									Title
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
+								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500"
+									>{formatFileSize(part?.size)}</td
 								>
-									Runtime
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
-								>
-									Codec
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									<button
-										type="button"
-										class="w-full text-left hover:bg-gray-100"
-										on:click={() => handleSort('overallBitrate')}
-										on:keydown={(e) => e.key === 'Enter' && handleSort('overallBitrate')}
-									>
-										Overall
-										{#if sortField === 'overallBitrate'}
-											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-										{/if}
-									</button>
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									<button
-										type="button"
-										class="w-full text-left hover:bg-gray-100"
-										on:click={() => handleSort('videoBitrate')}
-										on:keydown={(e) => e.key === 'Enter' && handleSort('videoBitrate')}
-									>
-										Video
-										{#if sortField === 'videoBitrate'}
-											<span class="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-										{/if}
-									</button>
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Audio
-								</th>
+								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
+									{#if video}{video.codec?.toUpperCase()} {video.height}p{:else}--{/if}
+								</td>
+								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
+									{#if audio}{audio.codec?.toUpperCase()} {audio.channels}ch{:else}--{/if}
+								</td>
 							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-100">
-							{#each $filteredEpisodes as episode (episode.ratingKey)}
-								<tr class="hover:bg-gray-50" use:observeEpisode={episode}>
-									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										S{episode.parentIndex.toString().padStart(2, '0')}E{episode.index
-											.toString()
-											.padStart(2, '0')}
-									</td>
-									<td class="px-2 py-1 text-xs">
-										<div class="flex items-center">
-											<span class="font-medium text-gray-900">{episode.title}</span>
-										</div>
-									</td>
-									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{formatDuration(episode.duration)}
-									</td>
-									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{#if episode.Media?.[0]}
-											{@const media = episode.Media[0]}
-											{media.videoCodec === 'hevc'
-												? 'HEVC'
-												: media.videoCodec?.toUpperCase() || '—'}
-										{:else}
-											—
-										{/if}
-									</td>
-									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{#if episode.Media?.[0]?.bitrate}
-											{episode.Media[0].bitrate} Kbps
-										{:else}
-											—
-										{/if}
-									</td>
-									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
-											{@const videoStream = episode.Media[0].Part[0].Stream.find(
-												(s: any) => s.streamType === 1
-											)}
-											{videoStream?.bitrate ? `${videoStream.bitrate} Kbps` : '—'}
-										{:else}
-											{@const detailedEpisode = detailedMedia.get(episode.ratingKey)}
-											{#if detailedEpisode?.Media?.[0]?.Part?.[0]?.Stream}
-												{@const videoStream = detailedEpisode.Media[0].Part[0].Stream.find(
-													(s: any) => s.streamType === 1
-												)}
-												{videoStream?.bitrate ? `${videoStream.bitrate} Kbps` : '—'}
-											{:else}
-												—
-											{/if}
-										{/if}
-									</td>
-									<td class="px-2 py-1 text-xs text-gray-500 whitespace-nowrap">
-										{#if episode.Media?.[0]?.Part?.[0]?.Stream}
-											{@const audioStream = episode.Media[0].Part[0].Stream.find(
-												(s: any) => s.streamType === 2
-											)}
-											{audioStream?.bitrate ? `${audioStream.bitrate} Kbps` : '—'}
-										{:else}
-											{@const detailedEpisode = detailedMedia.get(episode.ratingKey)}
-											{#if detailedEpisode?.Media?.[0]?.Part?.[0]?.Stream}
-												{@const audioStream = detailedEpisode.Media[0].Part[0].Stream.find(
-													(s: any) => s.streamType === 2
-												)}
-												{audioStream?.bitrate ? `${audioStream.bitrate} Kbps` : '—'}
-											{:else}
-												—
-											{/if}
-										{/if}
-									</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		{/if}
 	</main>
