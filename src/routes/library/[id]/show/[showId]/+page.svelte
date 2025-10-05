@@ -42,6 +42,7 @@
 	const sortDirectionStore = writable('asc');
 	let searchInput = '';
 	let searchTimeout: ReturnType<typeof setTimeout>;
+	let searchInputElement: HTMLInputElement;
 
 	// --- Reactive ---
 	$: libraryId = $page.params.id;
@@ -266,7 +267,24 @@
 	onMount(() => {
 		fetchLibraries();
 		fetchShowAndEpisodes();
+
+		// Global keyboard handler for "/" key
+		function handleGlobalKeydown(event: KeyboardEvent) {
+			// Only activate if "/" is pressed and we're not in an input/textarea
+			if (
+				event.key === '/' &&
+				document.activeElement?.tagName !== 'INPUT' &&
+				document.activeElement?.tagName !== 'TEXTAREA'
+			) {
+				event.preventDefault();
+				searchInputElement?.focus();
+			}
+		}
+
+		window.addEventListener('keydown', handleGlobalKeydown);
+
 		return () => {
+			window.removeEventListener('keydown', handleGlobalKeydown);
 			// Cleanup observers on component unmount
 			observers.forEach((observer) => observer.disconnect());
 			observers.clear();
@@ -367,8 +385,9 @@
 			<!-- Episode Filters -->
 			<div class="mb-4 p-2 bg-white shadow rounded-lg flex items-center gap-2">
 				<input
+					bind:this={searchInputElement}
 					type="search"
-					placeholder="Search episodes..."
+					placeholder="Search episodes... (press / to focus)"
 					bind:value={searchInput}
 					on:input={(e) => debounceSearch(e.currentTarget.value)}
 					class="flex-grow block w-full pl-3 pr-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-orange-500 focus:border-orange-500"

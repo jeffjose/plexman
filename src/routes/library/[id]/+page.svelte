@@ -59,6 +59,14 @@
 
 	$: libraryType = $librariesStore.find((lib) => lib.key === libraryId)?.type || null;
 
+	// Clear filters when library changes
+	$: if (libraryId) {
+		searchInput = '';
+		searchQuery.set('');
+		qualityFilter.set(null);
+		showMultiFileOnly.set(false);
+	}
+
 	const allSizesStore: Readable<number[]> = derived(mediaStore, ($mediaStore) =>
 		($mediaStore || [])
 			.flatMap((item) => item.Media?.map((m: MediaItem) => m?.Part?.[0]?.size || 0) || [])
