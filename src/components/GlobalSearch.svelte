@@ -79,7 +79,7 @@
 	}
 
 	function handleInput() {
-		selectedIndex = -1;
+		selectedIndex = 0; // Select first item by default
 		// Debounce search
 		performSearch(searchQuery);
 	}
@@ -92,10 +92,14 @@
 			selectedIndex = Math.min(selectedIndex + 1, searchResults.length - 1);
 		} else if (event.key === 'ArrowUp') {
 			event.preventDefault();
-			selectedIndex = Math.max(selectedIndex - 1, -1);
-		} else if (event.key === 'Enter' && selectedIndex >= 0) {
+			selectedIndex = Math.max(selectedIndex - 1, 0);
+		} else if (event.key === 'Enter') {
 			event.preventDefault();
-			navigateToResult(searchResults[selectedIndex]);
+			// Use first item if nothing selected, otherwise use selected item
+			const itemToNavigate = selectedIndex >= 0 ? searchResults[selectedIndex] : searchResults[0];
+			if (itemToNavigate) {
+				navigateToResult(itemToNavigate);
+			}
 		} else if (event.key === 'Escape') {
 			event.preventDefault();
 			closeSearch();
@@ -117,7 +121,7 @@
 		showResults = false;
 		searchQuery = '';
 		searchResults = [];
-		selectedIndex = -1;
+		selectedIndex = 0;
 	}
 
 	function formatResultTitle(item: PlexItem): string {
