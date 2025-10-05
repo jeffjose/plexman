@@ -444,7 +444,7 @@
 <div class="min-h-screen bg-gray-100">
 	<Header libraries={$librariesStore} />
 
-	<main class="w-full px-4 py-4">
+	<main class="max-w-7xl mx-auto px-4 py-4">
 		{#if $loadingStore}
 			<div class="flex justify-center items-center h-64">
 				<div
@@ -537,10 +537,10 @@
 			</div>
 
 			{#if libraryType === 'movie'}
-				<div class="bg-white shadow overflow-visible sm:rounded-md">
+				<div class="bg-white shadow overflow-x-auto sm:rounded-md">
 					<div class="min-w-full">
 						<div
-							class="bg-gray-50 grid grid-cols-[48px_1fr_56px_80px_112px_96px] gap-2 px-2 py-1 sticky top-0 z-10 border-b border-gray-200"
+							class="bg-gray-50 grid grid-cols-[48px_minmax(250px,1fr)_60px_80px_400px] gap-2 px-2 py-1 sticky top-0 z-10 border-b border-gray-200"
 						>
 							<div class="px-1 py-1"></div>
 							<div
@@ -572,11 +572,6 @@
 								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
 							>
 								Details
-							</div>
-							<div
-								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-							>
-								<!-- spacer -->
 							</div>
 						</div>
 						<div class="bg-white">

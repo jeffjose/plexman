@@ -88,7 +88,7 @@
 
 <div
 	bind:this={rowElement}
-	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''} grid grid-cols-[48px_1fr_56px_80px_112px_96px] gap-2 px-2 py-1 border-b border-gray-200 items-center"
+	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''} grid grid-cols-[48px_minmax(250px,1fr)_60px_80px_400px] gap-2 px-2 py-1 border-b border-gray-200 items-center"
 >
 	<div class="px-1 py-1">
 		{#if item.thumb && plexServerUrl && plexToken}
@@ -162,7 +162,7 @@
 				{/if}
 				{#each mediaVersions as mediaItem}
 					{#if mediaItem?.Part?.[0]?.file}
-						<div class="text-xs text-gray-400 truncate max-w-md">
+						<div class="text-xs text-gray-400 truncate">
 							{mediaItem.Part[0].file.split('/').pop()}
 						</div>
 					{/if}
