@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { writable, derived, type Readable, get } from 'svelte/store';
 	import Header from '../../../components/Header.svelte';
+	import VirtualList from '../../../components/VirtualList.svelte';
 	import MovieRow from './MovieRow.svelte';
 	import ShowRow from './ShowRow.svelte';
 
@@ -575,18 +576,20 @@
 							</div>
 						</div>
 						<div class="bg-white">
-							{#each $filteredAndSortedMedia as item (item.ratingKey)}
-								<MovieRow
-									{item}
-									detailedMedia={$detailedMediaStore}
-									onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
-									formatDuration={formatDurationSimple}
-									formatFileSize={formatFileSizeSimple}
-									allSizes={$allSizesStore}
-									allOverallBitrates={$allOverallBitratesStore}
-									calculatePercentileFn={calculatePercentile}
-								/>
-							{/each}
+							<VirtualList items={$filteredAndSortedMedia} itemHeight={80}>
+								{#snippet children(item: any)}
+									<MovieRow
+										{item}
+										detailedMedia={$detailedMediaStore}
+										onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
+										formatDuration={formatDurationSimple}
+										formatFileSize={formatFileSizeSimple}
+										allSizes={$allSizesStore}
+										allOverallBitrates={$allOverallBitratesStore}
+										calculatePercentileFn={calculatePercentile}
+									/>
+								{/snippet}
+							</VirtualList>
 						</div>
 					</div>
 				</div>

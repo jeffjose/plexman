@@ -1,5 +1,5 @@
 <script lang="ts" generics="T">
-	import { onMount, tick } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 
 	interface Props {
 		items: T[];
@@ -10,14 +10,20 @@
 
 	let { items, itemHeight, overscan = 5, children }: Props = $props();
 
-	let scrollContainer: HTMLDivElement;
+	let containerEl: HTMLDivElement;
 	let scrollTop = $state(0);
-	let containerHeight = $state(0);
+	let containerTop = $state(0);
+	let viewportHeight = $state(0);
 
-	// Calculate visible range
-	const startIndex = $derived(Math.max(0, Math.floor(scrollTop / itemHeight) - overscan));
+	// Calculate visible range based on window scroll
+	const startIndex = $derived(
+		Math.max(0, Math.floor((scrollTop - containerTop) / itemHeight) - overscan)
+	);
 	const endIndex = $derived(
-		Math.min(items.length, Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan)
+		Math.min(
+			items.length,
+			Math.ceil((scrollTop + viewportHeight - containerTop) / itemHeight) + overscan
+		)
 	);
 	const visibleItems = $derived(items.slice(startIndex, endIndex));
 
@@ -25,40 +31,35 @@
 	const offsetY = $derived(startIndex * itemHeight);
 
 	function handleScroll() {
-		if (scrollContainer) {
-			scrollTop = scrollContainer.scrollTop;
-		}
+		scrollTop = window.scrollY;
 	}
 
-	function updateContainerHeight() {
-		if (scrollContainer) {
-			containerHeight = scrollContainer.clientHeight;
+	function updateMeasurements() {
+		viewportHeight = window.innerHeight;
+		if (containerEl) {
+			containerTop = containerEl.offsetTop;
 		}
 	}
 
 	onMount(() => {
-		updateContainerHeight();
-		const resizeObserver = new ResizeObserver(updateContainerHeight);
-		if (scrollContainer) {
-			resizeObserver.observe(scrollContainer);
-		}
+		updateMeasurements();
+		window.addEventListener('scroll', handleScroll, { passive: true });
+		window.addEventListener('resize', updateMeasurements);
+
+		// Initial scroll position
+		handleScroll();
 
 		return () => {
-			resizeObserver.disconnect();
+			window.removeEventListener('scroll', handleScroll);
+			window.removeEventListener('resize', updateMeasurements);
 		};
 	});
 </script>
 
-<div
-	bind:this={scrollContainer}
-	on:scroll={handleScroll}
-	class="overflow-auto h-full w-full"
->
-	<div style="height: {totalHeight}px; position: relative;">
-		<div style="position: absolute; top: {offsetY}px; width: 100%;">
-			{#each visibleItems as item, i (items.indexOf(item))}
-				{@render children(item, startIndex + i)}
-			{/each}
-		</div>
+<div bind:this={containerEl} style="position: relative; height: {totalHeight}px; width: 100%;">
+	<div style="position: absolute; top: {offsetY}px; width: 100%;">
+		{#each visibleItems as item, i (items.indexOf(item))}
+			{@render children(item, startIndex + i)}
+		{/each}
 	</div>
 </div>
