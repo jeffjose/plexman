@@ -261,7 +261,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-100">
-	<Header {libraries} {plexToken} {plexServerUrl} />
+	<Header {libraries} {plexToken} {plexServerUrl} hideSearch={true} />
 
 	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6">
 		{#if loading}

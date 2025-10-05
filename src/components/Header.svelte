@@ -7,6 +7,7 @@
 	export let libraries: any[] = [];
 	export let plexToken: string | null = null;
 	export let plexServerUrl: string | null = null;
+	export let hideSearch: boolean = false;
 </script>
 
 <nav class="bg-white shadow-sm">
@@ -35,7 +36,7 @@
 				</div>
 			</div>
 			<div class="flex items-center gap-4">
-				{#if plexToken && plexServerUrl && libraries.length > 0}
+				{#if !hideSearch && plexToken && plexServerUrl && libraries.length > 0}
 					<div class="hidden md:block w-64">
 						<GlobalSearch {plexToken} {plexServerUrl} {libraries} />
 					</div>

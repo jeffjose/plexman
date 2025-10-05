@@ -53,6 +53,7 @@
 
 	let searchInput = $page.url.searchParams.get('search') || '';
 	let searchTimeout: ReturnType<typeof setTimeout>;
+	let searchInputElement: HTMLInputElement;
 
 	$: libraryId = $page.params.id;
 
@@ -321,6 +322,21 @@
 	onMount(() => {
 		fetchLibraries();
 
+		// Global keyboard handler for "/" key
+		function handleGlobalKeydown(event: KeyboardEvent) {
+			// Only activate if "/" is pressed and we're not in an input/textarea
+			if (
+				event.key === '/' &&
+				document.activeElement?.tagName !== 'INPUT' &&
+				document.activeElement?.tagName !== 'TEXTAREA'
+			) {
+				event.preventDefault();
+				searchInputElement?.focus();
+			}
+		}
+
+		window.addEventListener('keydown', handleGlobalKeydown);
+
 		const unsubscribeDerived = derived(
 			[searchQuery, qualityFilter, showMultiFileOnly, sortFieldStore, sortDirectionStore],
 			([$search, $quality, $multi, $sort, $direction]) => {
@@ -357,6 +373,7 @@
 		});
 
 		return () => {
+			window.removeEventListener('keydown', handleGlobalKeydown);
 			unsubscribeDerived();
 			unsubscribePage();
 			clearTimeout(searchTimeout);
@@ -460,7 +477,7 @@
 </svelte:head>
 
 <div class="min-h-screen bg-gray-100">
-	<Header libraries={$librariesStore} {plexToken} {plexServerUrl} />
+	<Header libraries={$librariesStore} {plexToken} {plexServerUrl} hideSearch={true} />
 
 	<main class="max-w-7xl mx-auto px-4 py-4">
 		{#if $loadingStore}
@@ -481,8 +498,9 @@
 			<div class="mb-4 flex items-center justify-between">
 				<div class="flex items-center space-x-4">
 					<input
+						bind:this={searchInputElement}
 						type="text"
-						placeholder="Search title..."
+						placeholder="Search title... (press / to focus)"
 						bind:value={searchInput}
 						on:input={(e) => debounceSearch(e.currentTarget.value)}
 						class="px-3 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-orange-500 focus:border-orange-500 bg-white"
