@@ -180,14 +180,17 @@
 		loading = true;
 		error = null;
 		try {
-			// Use API Proxy - no need for token/URL from localStorage
+			if (!plexServerUrl || !plexToken) {
+				throw new Error('Not authenticated');
+			}
 			const params = new URLSearchParams({
 				includeExternalMedia: '1',
-				includePreferences: '1' // Check if needed
-				// checkFiles: '1', // Removed - potentially slow
+				includePreferences: '1',
+				'X-Plex-Token': plexToken
 			});
 			const response = await fetch(
-				`/api/plex/library/sections/${libraryId}/all?${params.toString()}`
+				`${plexServerUrl}/library/sections/${libraryId}/all?${params.toString()}`,
+				{ headers: { Accept: 'application/json' } }
 			);
 
 			if (!response.ok) {

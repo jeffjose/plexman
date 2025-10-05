@@ -123,10 +123,12 @@
 
 			// Fetch all episodes
 			const episodesParams = new URLSearchParams({
-				includeExternalMedia: '1'
+				includeExternalMedia: '1',
+				'X-Plex-Token': plexToken
 			});
 			const episodesResponse = await fetch(
-				`/api/plex/library/metadata/${showId}/allLeaves?${episodesParams.toString()}`
+				`${plexServerUrl}/library/metadata/${showId}/allLeaves?${episodesParams.toString()}`,
+				{ headers: { Accept: 'application/json' } }
 			);
 			if (!episodesResponse.ok) {
 				let errorMsg = 'Failed to fetch episodes';
