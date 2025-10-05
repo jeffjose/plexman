@@ -449,69 +449,148 @@
 				{/if}
 			</div>
 
-			<!-- Episodes Table -->
-			<div class="bg-white shadow overflow-x-auto sm:rounded-md">
-				<div class="min-w-full">
-					<div
-						class="bg-gray-50 grid grid-cols-[60px_1fr_100px_80px_120px_100px] gap-2 px-2 py-2 sticky top-0 z-10 border-b border-gray-200"
-					>
-						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-							S/E
+			{#if activeTab === 'episodes'}
+				<!-- Episodes Table -->
+				<div class="bg-white shadow overflow-x-auto sm:rounded-md">
+					<div class="min-w-full">
+						<div
+							class="bg-gray-50 grid grid-cols-[60px_1fr_100px_80px_120px_100px] gap-2 px-2 py-2 sticky top-0 z-10 border-b border-gray-200"
+						>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								S/E
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Title
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Air Date
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Size
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Video
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Audio
+							</div>
 						</div>
-						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-							Title
+						<div class="bg-white">
+							<VirtualList items={$filteredAndSortedEpisodes} itemHeight={50}>
+								{#snippet children(episode: any)}
+									{@const detail = $detailedMedia.get(episode.ratingKey)}
+									{@const media = detail?.Media?.[0] || episode.Media?.[0]}
+									{@const part = media?.Part?.[0]}
+									{@const video = part?.Stream?.find((s: Stream) => s.streamType === 1)}
+									{@const audio = part?.Stream?.find((s: Stream) => s.streamType === 2)}
+									<div
+										use:observeEpisode={episode}
+										class="grid grid-cols-[60px_1fr_100px_80px_120px_100px] gap-2 px-2 py-2 border-b border-gray-200 hover:bg-gray-50"
+									>
+										<div class="px-2 py-1 text-sm text-gray-500">
+											{episode.parentIndex?.toString().padStart(2, '0')}x{episode.index
+												?.toString()
+												.padStart(2, '0')}
+										</div>
+										<div
+											class="px-2 py-1 text-sm font-medium text-gray-900 truncate"
+											title={episode.title}
+										>
+											{episode.title}
+										</div>
+										<div class="px-2 py-1 text-sm text-gray-500">
+											{episode.originallyAvailableAt || '--'}
+										</div>
+										<div class="px-2 py-1 text-sm text-gray-500">
+											{formatFileSize(part?.size)}
+										</div>
+										<div class="px-2 py-1 text-sm text-gray-500">
+											{#if video}{video.codec?.toUpperCase()} {video.height}p{:else}--{/if}
+										</div>
+										<div class="px-2 py-1 text-sm text-gray-500">
+											{#if audio}{audio.codec?.toUpperCase()} {audio.channels}ch{:else}--{/if}
+										</div>
+									</div>
+								{/snippet}
+							</VirtualList>
 						</div>
-						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-							Air Date
-						</div>
-						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-							Size
-						</div>
-						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-							Video
-						</div>
-						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-							Audio
-						</div>
-					</div>
-					<div class="bg-white">
-						<VirtualList items={$filteredAndSortedEpisodes} itemHeight={50}>
-							{#snippet children(episode: any)}
-								{@const detail = $detailedMedia.get(episode.ratingKey)}
-								{@const media = detail?.Media?.[0] || episode.Media?.[0]}
-								{@const part = media?.Part?.[0]}
-								{@const video = part?.Stream?.find((s: Stream) => s.streamType === 1)}
-								{@const audio = part?.Stream?.find((s: Stream) => s.streamType === 2)}
-								<div
-									use:observeEpisode={episode}
-									class="grid grid-cols-[60px_1fr_100px_80px_120px_100px] gap-2 px-2 py-2 border-b border-gray-200 hover:bg-gray-50"
-								>
-									<div class="px-2 py-1 text-sm text-gray-500">
-										{episode.parentIndex?.toString().padStart(2, '0')}x{episode.index
-											?.toString()
-											.padStart(2, '0')}
-									</div>
-									<div class="px-2 py-1 text-sm font-medium text-gray-900 truncate" title={episode.title}>
-										{episode.title}
-									</div>
-									<div class="px-2 py-1 text-sm text-gray-500">
-										{episode.originallyAvailableAt || '--'}
-									</div>
-									<div class="px-2 py-1 text-sm text-gray-500">
-										{formatFileSize(part?.size)}
-									</div>
-									<div class="px-2 py-1 text-sm text-gray-500">
-										{#if video}{video.codec?.toUpperCase()} {video.height}p{:else}--{/if}
-									</div>
-									<div class="px-2 py-1 text-sm text-gray-500">
-										{#if audio}{audio.codec?.toUpperCase()} {audio.channels}ch{:else}--{/if}
-									</div>
-								</div>
-							{/snippet}
-						</VirtualList>
 					</div>
 				</div>
-			</div>
+			{:else if activeTab === 'graph'}
+				<!-- Size Graph -->
+				<div class="bg-white shadow sm:rounded-md p-6">
+					{@const episodes = $filteredAndSortedEpisodes}
+					{@const episodesWithSize = episodes.map((ep) => {
+						const detail = $detailedMedia.get(ep.ratingKey);
+						const media = detail?.Media?.[0] || ep.Media?.[0];
+						const part = media?.Part?.[0];
+						const size = part?.size || 0;
+						return {
+							label: `S${ep.parentIndex?.toString().padStart(2, '0')}E${ep.index?.toString().padStart(2, '0')}`,
+							size: size,
+							title: ep.title
+						};
+					})}
+					{@const maxSize = Math.max(...episodesWithSize.map((e) => e.size), 1)}
+					{@const formatGraphSize = (bytes: number) => {
+						const gb = bytes / (1024 * 1024 * 1024);
+						if (gb >= 1) return `${gb.toFixed(1)}GB`;
+						const mb = bytes / (1024 * 1024);
+						return `${mb.toFixed(0)}MB`;
+					}}
+
+					<h2 class="text-lg font-semibold text-gray-900 mb-4">Episode File Sizes</h2>
+
+					<div class="overflow-x-auto">
+						<div class="min-w-max pb-4">
+							<div class="flex items-end space-x-1 h-96">
+								{#each episodesWithSize as ep, i}
+									{@const heightPercent = (ep.size / maxSize) * 100}
+									<div class="flex flex-col items-center group relative" style="width: 40px;">
+										<div
+											class="w-full bg-orange-500 hover:bg-orange-600 rounded-t transition-colors"
+											style="height: {heightPercent}%"
+											title="{ep.label}: {formatGraphSize(ep.size)} - {ep.title}"
+										></div>
+										<div
+											class="absolute -top-8 opacity-0 group-hover:opacity-100 bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap transition-opacity pointer-events-none z-10"
+										>
+											{ep.label}: {formatGraphSize(ep.size)}
+										</div>
+										<div
+											class="text-xs text-gray-600 mt-1 -rotate-45 origin-top-left whitespace-nowrap"
+											style="transform-origin: top left; transform: translateX(8px) translateY(2px) rotate(-45deg);"
+										>
+											{ep.label}
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					</div>
+
+					<!-- Y-axis labels -->
+					<div class="mt-4 flex justify-between text-xs text-gray-500">
+						<span>0</span>
+						<span>{formatGraphSize(maxSize / 4)}</span>
+						<span>{formatGraphSize(maxSize / 2)}</span>
+						<span>{formatGraphSize((maxSize * 3) / 4)}</span>
+						<span>{formatGraphSize(maxSize)}</span>
+					</div>
+				</div>
+			{/if}
 		{/if}
 	</main>
 </div>
