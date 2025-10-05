@@ -423,10 +423,10 @@
 	<title>{$librariesStore.find((l) => l.key === libraryId)?.title || 'Library'} - Plexman</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-100">
+<div class="min-h-screen bg-gray-100 flex flex-col">
 	<Header libraries={$librariesStore} />
 
-	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6">
+	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6 flex-1 w-full flex flex-col">
 		{#if $loadingStore}
 			<div class="flex justify-center items-center h-64">
 				<div
@@ -519,8 +519,8 @@
 			</div>
 
 			{#if libraryType === 'movie'}
-				<div class="bg-white shadow overflow-hidden sm:rounded-md">
-					<div class="min-w-full">
+				<div class="bg-white shadow overflow-hidden sm:rounded-md flex-1 flex flex-col">
+					<div class="min-w-full flex-1 flex flex-col">
 						<div
 							class="bg-gray-50 grid grid-cols-[48px_1fr_56px_80px_112px_96px] gap-2 px-2 py-1 sticky top-0 z-10 border-b border-gray-200"
 						>
@@ -561,7 +561,7 @@
 								<!-- spacer -->
 							</div>
 						</div>
-						<div class="h-[calc(100vh-20rem)] overflow-auto">
+						<div class="flex-1 min-h-0">
 							<VirtualList items={$filteredAndSortedMedia} itemHeight={80}>
 								{#snippet children(item: any)}
 									<MovieRow

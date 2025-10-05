@@ -52,8 +52,7 @@
 <div
 	bind:this={scrollContainer}
 	on:scroll={handleScroll}
-	class="overflow-auto"
-	style="height: 100%; width: 100%;"
+	class="overflow-auto h-full w-full"
 >
 	<div style="height: {totalHeight}px; position: relative;">
 		<div style="position: absolute; top: {offsetY}px; width: 100%;">
