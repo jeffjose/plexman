@@ -34,11 +34,16 @@
 					{/each}
 				</div>
 			</div>
-			<div class="flex items-center">
+			<div class="flex items-center gap-4">
+				{#if plexToken && plexServerUrl && libraries.length > 0}
+					<div class="hidden md:block w-64">
+						<GlobalSearch {plexToken} {plexServerUrl} {libraries} />
+					</div>
+				{/if}
 				<form action="/logout" method="POST" use:enhance>
 					<button
 						type="submit"
-						class="ml-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-orange-700 bg-orange-100 hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+						class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-orange-700 bg-orange-100 hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
 					>
 						<LogOut class="h-4 w-4 mr-2" />
 						Logout

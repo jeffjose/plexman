@@ -148,7 +148,7 @@
 
 <div class="min-h-screen bg-gray-100">
 	<!-- Pass libraries store/variable to Header -->
-	<Header {libraries} />
+	<Header {libraries} {plexToken} {plexServerUrl} />
 
 	<main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
 		{#if loading}
