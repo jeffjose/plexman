@@ -84,6 +84,34 @@
 			.filter((br) => br > 0)
 	);
 
+	// Pre-calculate percentiles once when media changes
+	const percentileCache: Readable<Map<string, number>> = derived(
+		[mediaStore, allOverallBitratesStore],
+		([$mediaStore, $allOverallBitrates]) => {
+			const cache = new Map<string, number>();
+			if ($allOverallBitrates.length === 0) return cache;
+
+			// Sort once
+			const sorted = [...$allOverallBitrates].sort((a, b) => a - b);
+
+			($mediaStore || []).forEach((item) => {
+				const bitrate = item.Media?.[0]?.bitrate || 0;
+				if (bitrate > 0) {
+					// Binary search or simple count
+					let count = 0;
+					for (const v of sorted) {
+						if (v <= bitrate) count++;
+						else break;
+					}
+					const percentile = Math.round((count / sorted.length) * 100);
+					cache.set(item.ratingKey, percentile);
+				}
+			});
+
+			return cache;
+		}
+	);
+
 	async function fetchLibraries() {
 		try {
 			if (!plexServerUrl || !plexToken) {
@@ -191,7 +219,8 @@
 			sortDirectionStore,
 			allSizesStore,
 			allOverallBitratesStore,
-			allVideoBitratesStore
+			allVideoBitratesStore,
+			percentileCache
 		],
 		([
 			$mediaStore,
@@ -203,22 +232,10 @@
 			$sortDirection,
 			$allSizes,
 			$allOverallBitrates,
-			$allVideoBitrates
+			$allVideoBitrates,
+			$percentileCache
 		]) => {
 			let result = $mediaStore || [];
-
-			// --- Pre-calculate percentiles if quality filter is active ---
-			let overallBitratePercentiles = new Map<string, number>();
-			if ($qualityFilter && $allOverallBitrates.length > 0) {
-				result.forEach((item) => {
-					const overallBitrate = item.Media?.[0]?.bitrate || 0;
-					overallBitratePercentiles.set(
-						item.ratingKey,
-						calculatePercentile(overallBitrate, $allOverallBitrates)
-					);
-				});
-			}
-			// -----------------------------------------------------------
 
 			if ($searchQuery) {
 				const query = $searchQuery.toLowerCase();
@@ -231,7 +248,7 @@
 
 			if ($qualityFilter) {
 				result = result.filter((item: PlexItem) => {
-					const overallBitratePercentile = overallBitratePercentiles.get(item.ratingKey) || 0;
+					const overallBitratePercentile = $percentileCache.get(item.ratingKey) || 0;
 					switch ($qualityFilter) {
 						case '90p':
 							return overallBitratePercentile >= 90;
