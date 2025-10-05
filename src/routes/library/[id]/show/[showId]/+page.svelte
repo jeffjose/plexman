@@ -42,7 +42,9 @@
 	const sortDirectionStore = writable('asc');
 	let searchInput = '';
 	let searchTimeout: ReturnType<typeof setTimeout>;
-	let searchInputElement: HTMLInputElement;
+	let activeTab = 'episodes'; // 'episodes' or 'graph'
+	let showSearchInput = '';
+	let showSearchInputElement: HTMLInputElement;
 
 	// --- Reactive ---
 	$: libraryId = $page.params.id;
@@ -54,6 +56,13 @@
 		searchTimeout = setTimeout(() => {
 			searchQuery.set(value);
 		}, 300);
+	}
+
+	function handleShowSearch(event: Event) {
+		event.preventDefault();
+		if (showSearchInput.trim()) {
+			goto(`/library/${libraryId}?search=${encodeURIComponent(showSearchInput)}`);
+		}
 	}
 
 	function formatDuration(ms: number): string {
@@ -268,16 +277,15 @@
 		fetchLibraries();
 		fetchShowAndEpisodes();
 
-		// Global keyboard handler for "/" key
+		// Global keyboard handler for "/" key to focus show search
 		function handleGlobalKeydown(event: KeyboardEvent) {
-			// Only activate if "/" is pressed and we're not in an input/textarea
 			if (
 				event.key === '/' &&
 				document.activeElement?.tagName !== 'INPUT' &&
 				document.activeElement?.tagName !== 'TEXTAREA'
 			) {
 				event.preventDefault();
-				searchInputElement?.focus();
+				showSearchInputElement?.focus();
 			}
 		}
 
@@ -309,7 +317,7 @@
 <div class="min-h-screen bg-gray-100">
 	<Header {libraries} {plexToken} {plexServerUrl} hideSearch={true} />
 
-	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6">
+	<main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
 		{#if loading}
 			<div class="flex justify-center items-center h-64">
 				<div
@@ -330,7 +338,7 @@
 			</div>
 		{:else}
 			<!-- Show Header -->
-			<div class="mb-4 p-3 bg-white shadow rounded-lg">
+			<div class="mb-6 p-4 sm:p-6 bg-white shadow rounded-lg">
 				<div class="flex flex-col sm:flex-row sm:space-x-4">
 					{#if show.thumb && plexServerUrl && plexToken}
 						<img
@@ -382,18 +390,63 @@
 				</div>
 			</div>
 
-			<!-- Episode Filters -->
-			<div class="mb-4 p-2 bg-white shadow rounded-lg flex items-center gap-2">
-				<input
-					bind:this={searchInputElement}
-					type="search"
-					placeholder="Search episodes... (press / to focus)"
-					bind:value={searchInput}
-					on:input={(e) => debounceSearch(e.currentTarget.value)}
-					class="flex-grow block w-full pl-3 pr-3 py-1 border border-gray-300 rounded-md text-sm focus:ring-orange-500 focus:border-orange-500"
-				/>
-				<!-- Add sort controls if needed -->
-				<span class="text-sm text-gray-500">{$filteredAndSortedEpisodes.length} episodes</span>
+			<!-- Show Search -->
+			<div class="mb-4 bg-white shadow rounded-lg p-3">
+				<form on:submit={handleShowSearch} class="flex gap-2">
+					<input
+						bind:this={showSearchInputElement}
+						bind:value={showSearchInput}
+						type="search"
+						placeholder="Search TV shows... (press / to focus)"
+						class="flex-grow px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-orange-500 focus:border-orange-500"
+					/>
+					<button
+						type="submit"
+						class="px-4 py-2 bg-orange-500 text-white rounded-md text-sm font-medium hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500"
+					>
+						Search
+					</button>
+				</form>
+			</div>
+
+			<!-- Tabs -->
+			<div class="mb-4 bg-white shadow rounded-lg">
+				<div class="border-b border-gray-200">
+					<nav class="-mb-px flex space-x-8 px-6" aria-label="Tabs">
+						<button
+							on:click={() => (activeTab = 'episodes')}
+							class="border-b-2 py-4 px-1 text-sm font-medium {activeTab === 'episodes'
+								? 'border-orange-500 text-orange-600'
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+						>
+							Episodes
+						</button>
+						<button
+							on:click={() => (activeTab = 'graph')}
+							class="border-b-2 py-4 px-1 text-sm font-medium {activeTab === 'graph'
+								? 'border-orange-500 text-orange-600'
+								: 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}"
+						>
+							Size Graph
+						</button>
+					</nav>
+				</div>
+
+				<!-- Episode Filters (only show on episodes tab) -->
+				{#if activeTab === 'episodes'}
+					<div class="p-3 flex items-center gap-2 border-b border-gray-200">
+						<input
+							type="search"
+							placeholder="Filter episodes..."
+							bind:value={searchInput}
+							on:input={(e) => debounceSearch(e.currentTarget.value)}
+							class="flex-grow block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-orange-500 focus:border-orange-500"
+						/>
+						<span class="text-sm text-gray-500 whitespace-nowrap"
+							>{$filteredAndSortedEpisodes.length} episodes</span
+						>
+					</div>
+				{/if}
 			</div>
 
 			<!-- Episodes Table -->
