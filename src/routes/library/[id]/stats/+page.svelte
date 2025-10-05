@@ -4,6 +4,9 @@
 	import { goto } from '$app/navigation';
 	import Header from '../../../../components/Header.svelte';
 
+	// Access server data
+	$: ({ plexToken, plexServerUrl } = $page.data);
+
 	interface Stream {
 		streamType: number;
 		codec?: string;
@@ -212,9 +215,13 @@
 	}
 
 	async function fetchLibraries() {
-		// Use API Proxy - no need for token/URL from localStorage
 		try {
-			const response = await fetch(`/api/plex/library/sections`);
+			if (!plexServerUrl || !plexToken) {
+				throw new Error('Not authenticated');
+			}
+			const response = await fetch(
+				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`
+			);
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch libraries';
 				try {

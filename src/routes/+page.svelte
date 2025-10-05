@@ -51,10 +51,14 @@
 	$: loading = loadingLibraries || loadingSessions;
 
 	async function fetchSessions() {
-		// No need for token/URL here, cookies are handled by proxy
 		try {
 			loadingSessions = true;
-			const response = await fetch(`/api/plex/status/sessions`);
+			if (!plexServerUrl || !plexToken) {
+				throw new Error('Not authenticated');
+			}
+			const response = await fetch(
+				`${plexServerUrl}/status/sessions?X-Plex-Token=${plexToken}`
+			);
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch sessions';
 				try {
@@ -78,10 +82,14 @@
 	}
 
 	async function fetchLibraries() {
-		// No need for token/URL here, cookies are handled by proxy
 		try {
 			loadingLibraries = true;
-			const response = await fetch(`/api/plex/library/sections`);
+			if (!plexServerUrl || !plexToken) {
+				throw new Error('Not authenticated');
+			}
+			const response = await fetch(
+				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`
+			);
 
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch libraries';

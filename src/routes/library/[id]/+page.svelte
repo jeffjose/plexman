@@ -4,9 +4,11 @@
 	import { goto } from '$app/navigation';
 	import { writable, derived, type Readable, get } from 'svelte/store';
 	import Header from '../../../components/Header.svelte';
-	import VirtualList from '../../../components/VirtualList.svelte';
 	import MovieRow from './MovieRow.svelte';
 	import ShowRow from './ShowRow.svelte';
+
+	// Access server data
+	$: ({ plexToken, plexServerUrl } = $page.data);
 
 	interface Stream {
 		streamType: number;
@@ -83,7 +85,12 @@
 
 	async function fetchLibraries() {
 		try {
-			const response = await fetch(`/api/plex/library/sections`);
+			if (!plexServerUrl || !plexToken) {
+				throw new Error('Not authenticated');
+			}
+			const response = await fetch(
+				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`
+			);
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch libraries';
 				try {
@@ -108,12 +115,16 @@
 		loadingStore.set(true);
 		errorStore.set(null);
 		try {
+			if (!plexServerUrl || !plexToken) {
+				throw new Error('Not authenticated');
+			}
 			const params = new URLSearchParams({
 				type: type === 'show' ? '2' : '1',
 				includeExternalMedia: '1',
-				includePreferences: '1'
+				includePreferences: '1',
+				'X-Plex-Token': plexToken
 			});
-			const response = await fetch(`/api/plex/library/sections/${id}/all?${params.toString()}`);
+			const response = await fetch(`${plexServerUrl}/library/sections/${id}/all?${params.toString()}`);
 
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch media';
@@ -139,11 +150,13 @@
 		if (!ratingKey || $detailedMediaStore.has(ratingKey)) return;
 
 		try {
+			if (!plexServerUrl || !plexToken) return;
 			const params = new URLSearchParams({
 				includeExternalMedia: '1',
-				includePreferences: '1'
+				includePreferences: '1',
+				'X-Plex-Token': plexToken
 			});
-			const response = await fetch(`/api/plex/library/metadata/${ratingKey}?${params.toString()}`);
+			const response = await fetch(`${plexServerUrl}/library/metadata/${ratingKey}?${params.toString()}`);
 
 			if (!response.ok) {
 				console.warn(`Failed to fetch detailed metadata for ${ratingKey}: ${response.status}`);
@@ -423,10 +436,10 @@
 	<title>{$librariesStore.find((l) => l.key === libraryId)?.title || 'Library'} - Plexman</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-100 flex flex-col">
+<div class="min-h-screen bg-gray-100">
 	<Header libraries={$librariesStore} />
 
-	<main class="max-w-7xl mx-auto py-4 sm:px-4 lg:px-6 flex-1 w-full flex flex-col">
+	<main class="w-full px-4 py-4">
 		{#if $loadingStore}
 			<div class="flex justify-center items-center h-64">
 				<div
@@ -519,8 +532,8 @@
 			</div>
 
 			{#if libraryType === 'movie'}
-				<div class="bg-white shadow overflow-hidden sm:rounded-md flex-1 flex flex-col">
-					<div class="min-w-full flex-1 flex flex-col">
+				<div class="bg-white shadow overflow-visible sm:rounded-md">
+					<div class="min-w-full">
 						<div
 							class="bg-gray-50 grid grid-cols-[48px_1fr_56px_80px_112px_96px] gap-2 px-2 py-1 sticky top-0 z-10 border-b border-gray-200"
 						>
@@ -561,21 +574,19 @@
 								<!-- spacer -->
 							</div>
 						</div>
-						<div class="flex-1 min-h-0">
-							<VirtualList items={$filteredAndSortedMedia} itemHeight={80}>
-								{#snippet children(item: any)}
-									<MovieRow
-										{item}
-										detailedMedia={$detailedMediaStore}
-										onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
-										formatDuration={formatDurationSimple}
-										formatFileSize={formatFileSizeSimple}
-										allSizes={$allSizesStore}
-										allOverallBitrates={$allOverallBitratesStore}
-										calculatePercentileFn={calculatePercentile}
-									/>
-								{/snippet}
-							</VirtualList>
+						<div class="bg-white">
+							{#each $filteredAndSortedMedia as item (item.ratingKey)}
+								<MovieRow
+									{item}
+									detailedMedia={$detailedMediaStore}
+									onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
+									formatDuration={formatDurationSimple}
+									formatFileSize={formatFileSizeSimple}
+									allSizes={$allSizesStore}
+									allOverallBitrates={$allOverallBitratesStore}
+									calculatePercentileFn={calculatePercentile}
+								/>
+							{/each}
 						</div>
 					</div>
 				</div>
