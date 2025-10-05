@@ -4,6 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { writable, derived, type Readable, get } from 'svelte/store';
 	import Header from '../../../components/Header.svelte';
+	import VirtualList from '../../../components/VirtualList.svelte';
 	import MovieRow from './MovieRow.svelte';
 	import ShowRow from './ShowRow.svelte';
 
@@ -519,62 +520,64 @@
 
 			{#if libraryType === 'movie'}
 				<div class="bg-white shadow overflow-hidden sm:rounded-md">
-					<table class="min-w-full divide-y divide-gray-200">
-						<thead class="bg-gray-50">
-							<tr>
-								<th class="px-1 py-1 w-12"></th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+					<div class="min-w-full">
+						<div
+							class="bg-gray-50 grid grid-cols-[48px_1fr_56px_80px_112px_96px] gap-2 px-2 py-1 sticky top-0 z-10 border-b border-gray-200"
+						>
+							<div class="px-1 py-1"></div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Title ({$filteredAndSortedMedia.length})
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								<button
+									type="button"
+									class="w-full text-left hover:bg-gray-100 flex items-center"
+									on:click={() => handleSort('year')}
+									on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
 								>
-									Title ({$filteredAndSortedMedia.length})
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-14"
-								>
-									<button
-										type="button"
-										class="w-full text-left hover:bg-gray-100 flex items-center"
-										on:click={() => handleSort('year')}
-										on:keydown={(e) => e.key === 'Enter' && handleSort('year')}
-									>
-										Year
-										{#if $sortFieldStore === 'year'}
-											<span class="ml-1">{$sortDirectionStore === 'asc' ? '↑' : '↓'}</span>
-										{/if}
-									</button>
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>
-									Size
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
-								>
-									Bitrate (File/Vid)
-								</th>
-								<th
-									class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24"
-								>
-									Quality (File/Vid)
-								</th>
-							</tr>
-						</thead>
-						<tbody class="bg-white divide-y divide-gray-200">
-							{#each $filteredAndSortedMedia as item (item.ratingKey)}
-								<MovieRow
-									{item}
-									detailedMedia={$detailedMediaStore}
-									onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
-									formatDuration={formatDurationSimple}
-									formatFileSize={formatFileSizeSimple}
-									allSizes={$allSizesStore}
-									allOverallBitrates={$allOverallBitratesStore}
-									calculatePercentileFn={calculatePercentile}
-								/>
-							{/each}
-						</tbody>
-					</table>
+									Year
+									{#if $sortFieldStore === 'year'}
+										<span class="ml-1">{$sortDirectionStore === 'asc' ? '↑' : '↓'}</span>
+									{/if}
+								</button>
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Duration
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								Details
+							</div>
+							<div
+								class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+							>
+								<!-- spacer -->
+							</div>
+						</div>
+						<div class="h-[calc(100vh-20rem)] overflow-auto">
+							<VirtualList items={$filteredAndSortedMedia} itemHeight={80}>
+								{#snippet children(item: any)}
+									<MovieRow
+										{item}
+										detailedMedia={$detailedMediaStore}
+										onDebug={(itemForDebug) => fetchDetailedMedia(itemForDebug.ratingKey)}
+										formatDuration={formatDurationSimple}
+										formatFileSize={formatFileSizeSimple}
+										allSizes={$allSizesStore}
+										allOverallBitrates={$allOverallBitratesStore}
+										calculatePercentileFn={calculatePercentile}
+									/>
+								{/snippet}
+							</VirtualList>
+						</div>
+					</div>
 				</div>
 			{:else if libraryType === 'show'}
 				<div

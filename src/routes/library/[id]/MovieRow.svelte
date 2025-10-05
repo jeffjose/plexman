@@ -86,11 +86,11 @@
 	$: hasMultipleVersions = mediaVersions.length > 1;
 </script>
 
-<tr
+<div
 	bind:this={rowElement}
-	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''}"
+	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''} grid grid-cols-[48px_1fr_56px_80px_112px_96px] gap-2 px-2 py-1 border-b border-gray-200 items-center"
 >
-	<td class="px-1 py-1">
+	<div class="px-1 py-1">
 		{#if item.thumb && plexServerUrl && plexToken}
 			<img
 				src={`${plexServerUrl}${item.thumb}?X-Plex-Token=${plexToken}`}
@@ -108,8 +108,8 @@
 				>
 			</div>
 		{/if}
-	</td>
-	<td class="px-2 py-1">
+	</div>
+	<div class="px-2 py-1">
 		<div class="flex items-center space-x-2">
 			{#if item.Media?.[0]?.bitrate}
 				{@const size = item.Media[0].Part?.[0]?.size || 0}
@@ -169,10 +169,10 @@
 				{/each}
 			</div>
 		</div>
-	</td>
-	<td class="px-2 py-1 text-xs text-gray-500">{item.year}</td>
-	<td class="px-2 py-1 text-xs text-gray-500">{formatDuration(item.duration)}</td>
-	<td class="px-2 py-1">
+	</div>
+	<div class="px-2 py-1 text-xs text-gray-500">{item.year}</div>
+	<div class="px-2 py-1 text-xs text-gray-500">{formatDuration(item.duration)}</div>
+	<div class="px-2 py-1">
 		<div class="space-y-1">
 			{#each mediaVersions as mediaItem, i}
 				{@const size = mediaItem?.Part?.[0]?.size || 0}
@@ -213,5 +213,5 @@
 				</div>
 			{/each}
 		</div>
-	</td>
-</tr>
+	</div>
+</div>
