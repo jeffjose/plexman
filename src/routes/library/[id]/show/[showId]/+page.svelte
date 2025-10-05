@@ -29,7 +29,7 @@
 
 	// --- State ---
 	let show: PlexItem | null = null;
-	let episodes: PlexItem[] = [];
+	const episodesStore = writable<PlexItem[]>([]);
 	let loading = true;
 	let error: string | null = null;
 	let libraries: any[] = [];
@@ -141,10 +141,10 @@
 				throw new Error(`${errorMsg} (Status: ${episodesResponse.status})`);
 			}
 			const episodesData = await episodesResponse.json();
-			episodes = episodesData.MediaContainer.Metadata || [];
+			episodesStore.set(episodesData.MediaContainer.Metadata || []);
 		} catch (e: any) {
 			console.error('Failed to fetch show/episodes:', e);
-			episodes = [];
+			episodesStore.set([]);
 			show = null;
 			error = e.message || 'An error occurred loading the show.';
 		} finally {
@@ -214,7 +214,7 @@
 
 	// --- Filtering & Sorting Episodes ---
 	const filteredAndSortedEpisodes = derived(
-		[writable(episodes), searchQuery, sortFieldStore, sortDirectionStore], // Use writable(episodes) to react to changes
+		[episodesStore, searchQuery, sortFieldStore, sortDirectionStore],
 		([$episodes, $searchQuery, $sortField, $sortDirection]) => {
 			let result = $episodes || [];
 
