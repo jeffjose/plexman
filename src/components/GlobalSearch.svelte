@@ -13,6 +13,7 @@
 	interface PlexItem {
 		ratingKey: string;
 		title: string;
+		originalTitle?: string;
 		type: string;
 		year?: number;
 		parentTitle?: string;
@@ -40,23 +41,24 @@
 	let showResults = $state(false);
 	let searchInput: HTMLInputElement;
 	let selectedIndex = $state(0);
+	let allMediaCache = $state<PlexItem[]>([]);
+	let cacheLoaded = $state(false);
 
-	async function performSearch(query: string) {
-		if (!query.trim()) {
-			searchResults = [];
-			showResults = false;
-			return;
-		}
+	// Load all media from all libraries on mount
+	async function loadAllMedia() {
+		if (cacheLoaded) return;
 
 		isSearching = true;
-		showResults = true;
-		const allResults: PlexItem[] = [];
+		const allItems: PlexItem[] = [];
 
 		try {
-			// Search across all libraries
 			for (const library of libraries) {
+				const params = new URLSearchParams({
+					type: library.type === 'show' ? '2' : '1',
+					'X-Plex-Token': plexToken
+				});
 				const response = await fetch(
-					`${plexServerUrl}/library/sections/${library.key}/all?X-Plex-Token=${plexToken}&title=${encodeURIComponent(query)}`,
+					`${plexServerUrl}/library/sections/${library.key}/all?${params.toString()}`,
 					{ headers: { Accept: 'application/json' } }
 				);
 
@@ -66,16 +68,35 @@
 						...item,
 						librarySectionKey: library.key
 					}));
-					allResults.push(...items);
+					allItems.push(...items);
 				}
 			}
 
-			searchResults = allResults.slice(0, 20); // Limit to top 20 results
+			allMediaCache = allItems;
+			cacheLoaded = true;
 		} catch (e) {
-			console.error('Search failed:', e);
+			console.error('Failed to load media cache:', e);
 		} finally {
 			isSearching = false;
 		}
+	}
+
+	function performSearch(query: string) {
+		if (!query.trim()) {
+			searchResults = [];
+			showResults = false;
+			return;
+		}
+
+		showResults = true;
+		const searchLower = query.toLowerCase();
+
+		const results = allMediaCache.filter((item) =>
+			item.title?.toLowerCase().includes(searchLower) ||
+			item.originalTitle?.toLowerCase().includes(searchLower)
+		);
+
+		searchResults = results.slice(0, 20); // Limit to top 20 results
 	}
 
 	function handleInput() {
@@ -134,6 +155,9 @@
 	}
 
 	onMount(() => {
+		// Load all media on mount
+		loadAllMedia();
+
 		// Global keyboard handler for "/" key
 		function handleGlobalKeydown(event: KeyboardEvent) {
 			// Only activate if "/" is pressed and we're not in an input/textarea
