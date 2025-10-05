@@ -6,6 +6,9 @@
 	import MovieRow from '../../MovieRow.svelte';
 	import Header from '../../../../../components/Header.svelte';
 
+	// Access server data
+	$: ({ plexToken, plexServerUrl } = $page.data);
+
 	// --- Interfaces ---
 	interface Stream {
 		streamType: number;
@@ -293,9 +296,9 @@
 			<!-- Show Header -->
 			<div class="mb-4 p-3 bg-white shadow rounded-lg">
 				<div class="flex flex-col sm:flex-row sm:space-x-4">
-					{#if show.thumb}
+					{#if show.thumb && plexServerUrl && plexToken}
 						<img
-							src={`/api/plex-image${show.thumb}`}
+							src={`${plexServerUrl}${show.thumb}?X-Plex-Token=${plexToken}`}
 							alt={show.title}
 							class="w-32 h-48 sm:w-40 sm:h-60 object-cover rounded mx-auto sm:mx-0 mb-3 sm:mb-0 flex-shrink-0 bg-gray-200"
 							loading="lazy"

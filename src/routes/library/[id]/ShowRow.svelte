@@ -1,8 +1,15 @@
 <script lang="ts">
+	import { page } from '$app/stores';
+
 	export let show: any;
 	export let libraryId: string;
 
-	$: posterUrl = show.thumb ? `/api/plex-image${show.thumb}` : '';
+	// Access server data
+	$: ({ plexToken, plexServerUrl } = $page.data);
+	$: posterUrl =
+		show.thumb && plexServerUrl && plexToken
+			? `${plexServerUrl}${show.thumb}?X-Plex-Token=${plexToken}`
+			: '';
 </script>
 
 <a

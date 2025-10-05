@@ -40,11 +40,14 @@ All Plex API calls route through SvelteKit server endpoints to keep tokens secur
   - Active sessions: no cache
   - Metadata: 2 hours
 
-### Image Proxy
+### Image Handling
 
-- **Route**: `/api/plex-image/[...path]/+server.ts`
-- **Purpose**: Proxies Plex thumbnail/poster images with authentication
-- **Usage**: `<img src="/api/plex-image{thumbPath}" />`
+Images are hot-linked directly from the Plex server to minimize bandwidth usage:
+
+- **Server Data**: `+layout.server.ts` exposes `plexToken` and `plexServerUrl` to client
+- **Usage**: `<img src="{plexServerUrl}{thumbPath}?X-Plex-Token={token}" />`
+- **Benefits**: Eliminates server-side image proxy overhead, reduces Vercel bandwidth costs
+- **Security**: Token is visible in image URLs but protected by HTTPS in production
 
 ## Key Features
 
@@ -103,6 +106,7 @@ Key types defined inline in components:
 ```
 src/
 ├── routes/
+│   ├── +layout.server.ts          # Server data (plexToken, plexServerUrl)
 │   ├── +page.svelte              # Dashboard
 │   ├── login/+page.svelte         # Login page
 │   ├── logout/+server.ts          # Logout endpoint
@@ -110,8 +114,7 @@ src/
 │   │   ├── +page.svelte
 │   │   └── +page.server.ts        # Auth callback handler
 │   ├── api/
-│   │   ├── plex/[...path]/+server.ts       # Main API proxy
-│   │   └── plex-image/[...path]/+server.ts # Image proxy
+│   │   └── plex/[...path]/+server.ts # Main API proxy
 │   └── library/[id]/
 │       ├── +page.svelte           # Library browser
 │       ├── MovieRow.svelte        # Movie table row component

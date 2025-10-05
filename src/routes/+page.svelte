@@ -1,7 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import Header from '../components/Header.svelte';
+
+	// Access server data
+	$: ({ plexToken, plexServerUrl } = $page.data);
 
 	// Types (assuming these might be shared or moved later)
 	interface SessionMediaPartStream {
@@ -171,9 +175,9 @@
 						<div class="bg-white overflow-hidden shadow rounded-lg">
 							<div class="p-4">
 								<div class="flex space-x-3">
-									{#if session.thumb}
+									{#if session.thumb && plexServerUrl && plexToken}
 										<img
-											src={`/api/plex-image${session.thumb}`}
+											src={`${plexServerUrl}${session.thumb}?X-Plex-Token=${plexToken}`}
 											alt={session.title}
 											class="w-16 h-24 object-cover rounded bg-gray-200"
 											loading="lazy"

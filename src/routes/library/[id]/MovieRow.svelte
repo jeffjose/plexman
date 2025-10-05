@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, afterUpdate } from 'svelte';
+	import { page } from '$app/stores';
 
 	export let item: any;
 	export let detailedMedia: Map<string, any>;
@@ -9,6 +10,9 @@
 	export let allSizes: number[] = [];
 	export let allOverallBitrates: number[] = [];
 	export let calculatePercentileFn: (value: number, allValues: number[]) => number;
+
+	// Access server data
+	$: ({ plexToken, plexServerUrl } = $page.data);
 
 	let rowElement: HTMLElement;
 	let observer: IntersectionObserver | null = null;
@@ -87,9 +91,9 @@
 	class="group hover:bg-gray-50 {hasMultipleVersions ? 'border-l-2 border-orange-400' : ''}"
 >
 	<td class="px-1 py-1">
-		{#if item.thumb}
+		{#if item.thumb && plexServerUrl && plexToken}
 			<img
-				src={`/api/plex-image${item.thumb}`}
+				src={`${plexServerUrl}${item.thumb}?X-Plex-Token=${plexToken}`}
 				alt={item.title}
 				class="w-12 h-16 object-cover rounded bg-gray-200"
 				loading="lazy"
