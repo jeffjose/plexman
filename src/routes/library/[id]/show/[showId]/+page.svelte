@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { writable, derived } from 'svelte/store';
+	import VirtualList from '../../../../../components/VirtualList.svelte';
 	import MovieRow from '../../MovieRow.svelte';
 	import Header from '../../../../../components/Header.svelte';
 
@@ -377,77 +378,67 @@
 			</div>
 
 			<!-- Episodes Table -->
-			<div class="bg-white shadow overflow-hidden sm:rounded-md">
-				<table class="min-w-full divide-y divide-gray-200">
-					<thead class="bg-gray-50">
-						<tr>
-							<th
-								scope="col"
-								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10"
-								>S/E</th
-							>
-							<th
-								scope="col"
-								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-								>Title</th
-							>
-							<th
-								scope="col"
-								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>Air Date</th
-							>
-							<th
-								scope="col"
-								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
-								>Size</th
-							>
-							<th
-								scope="col"
-								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28"
-								>Video</th
-							>
-							<th
-								scope="col"
-								class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20"
-								>Audio</th
-							>
-						</tr>
-					</thead>
-					<tbody class="bg-white divide-y divide-gray-200">
-						{#each $filteredAndSortedEpisodes as episode (episode.ratingKey)}
-							{@const detail = $detailedMedia.get(episode.ratingKey)}
-							{@const media = detail?.Media?.[0] || episode.Media?.[0]}
-							{@const part = media?.Part?.[0]}
-							{@const video = part?.Stream?.find((s: Stream) => s.streamType === 1)}
-							{@const audio = part?.Stream?.find((s: Stream) => s.streamType === 2)}
-							<tr use:observeEpisode={episode} class="hover:bg-gray-50">
-								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
-									{episode.parentIndex?.toString().padStart(2, '0')}x{episode.index
-										?.toString()
-										.padStart(2, '0')}
-								</td>
-								<td
-									class="px-2 py-2 text-sm font-medium text-gray-900 truncate"
-									title={episode.title}
+			<div class="bg-white shadow overflow-x-auto sm:rounded-md">
+				<div class="min-w-full">
+					<div
+						class="bg-gray-50 grid grid-cols-[60px_1fr_100px_80px_120px_100px] gap-2 px-2 py-2 sticky top-0 z-10 border-b border-gray-200"
+					>
+						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							S/E
+						</div>
+						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							Title
+						</div>
+						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							Air Date
+						</div>
+						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							Size
+						</div>
+						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							Video
+						</div>
+						<div class="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+							Audio
+						</div>
+					</div>
+					<div class="bg-white">
+						<VirtualList items={$filteredAndSortedEpisodes} itemHeight={50}>
+							{#snippet children(episode: any)}
+								{@const detail = $detailedMedia.get(episode.ratingKey)}
+								{@const media = detail?.Media?.[0] || episode.Media?.[0]}
+								{@const part = media?.Part?.[0]}
+								{@const video = part?.Stream?.find((s: Stream) => s.streamType === 1)}
+								{@const audio = part?.Stream?.find((s: Stream) => s.streamType === 2)}
+								<div
+									use:observeEpisode={episode}
+									class="grid grid-cols-[60px_1fr_100px_80px_120px_100px] gap-2 px-2 py-2 border-b border-gray-200 hover:bg-gray-50"
 								>
-									{episode.title}
-								</td>
-								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500"
-									>{episode.originallyAvailableAt || '--'}</td
-								>
-								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500"
-									>{formatFileSize(part?.size)}</td
-								>
-								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
-									{#if video}{video.codec?.toUpperCase()} {video.height}p{:else}--{/if}
-								</td>
-								<td class="px-2 py-2 whitespace-nowrap text-sm text-gray-500">
-									{#if audio}{audio.codec?.toUpperCase()} {audio.channels}ch{:else}--{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+									<div class="px-2 py-1 text-sm text-gray-500">
+										{episode.parentIndex?.toString().padStart(2, '0')}x{episode.index
+											?.toString()
+											.padStart(2, '0')}
+									</div>
+									<div class="px-2 py-1 text-sm font-medium text-gray-900 truncate" title={episode.title}>
+										{episode.title}
+									</div>
+									<div class="px-2 py-1 text-sm text-gray-500">
+										{episode.originallyAvailableAt || '--'}
+									</div>
+									<div class="px-2 py-1 text-sm text-gray-500">
+										{formatFileSize(part?.size)}
+									</div>
+									<div class="px-2 py-1 text-sm text-gray-500">
+										{#if video}{video.codec?.toUpperCase()} {video.height}p{:else}--{/if}
+									</div>
+									<div class="px-2 py-1 text-sm text-gray-500">
+										{#if audio}{audio.codec?.toUpperCase()} {audio.channels}ch{:else}--{/if}
+									</div>
+								</div>
+							{/snippet}
+						</VirtualList>
+					</div>
+				</div>
 			</div>
 		{/if}
 	</main>

@@ -2,7 +2,11 @@
 	import { goto } from '$app/navigation';
 	import { enhance } from '$app/forms';
 	import { Film, Tv, LogOut } from 'lucide-svelte';
+	import GlobalSearch from './GlobalSearch.svelte';
+
 	export let libraries: any[] = [];
+	export let plexToken: string | null = null;
+	export let plexServerUrl: string | null = null;
 </script>
 
 <nav class="bg-white shadow-sm">
