@@ -81,7 +81,8 @@
 				throw new Error('Not authenticated');
 			}
 			const response = await fetch(
-				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`
+				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`,
+				{ headers: { Accept: 'application/json' } }
 			);
 			if (!response.ok) {
 				console.warn(`Failed to fetch libraries for header: ${response.status}`);
@@ -105,7 +106,8 @@
 			}
 			// Fetch show details
 			const showResponse = await fetch(
-				`${plexServerUrl}/library/metadata/${showId}?includeChildren=1&X-Plex-Token=${plexToken}`
+				`${plexServerUrl}/library/metadata/${showId}?includeChildren=1&X-Plex-Token=${plexToken}`,
+				{ headers: { Accept: 'application/json' } }
 			);
 			if (!showResponse.ok) {
 				let errorMsg = 'Failed to fetch show details';
@@ -157,7 +159,9 @@
 				includeExternalMedia: '1',
 				'X-Plex-Token': plexToken || ''
 			});
-			const response = await fetch(`${plexServerUrl}/library/metadata/${ratingKey}?${params.toString()}`);
+			const response = await fetch(`${plexServerUrl}/library/metadata/${ratingKey}?${params.toString()}`, {
+				headers: { Accept: 'application/json' }
+			});
 			if (!response.ok) {
 				console.warn(
 					`Failed to fetch detailed metadata for episode ${ratingKey}: ${response.status}`

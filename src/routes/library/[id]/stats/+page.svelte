@@ -220,7 +220,8 @@
 				throw new Error('Not authenticated');
 			}
 			const response = await fetch(
-				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`
+				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`,
+				{ headers: { Accept: 'application/json' } }
 			);
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch libraries';

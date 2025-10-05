@@ -27,27 +27,20 @@ Plexman is a modern web application for managing and browsing Plex media librari
    - `plexServerUrlLocal`: HTTP URL for local network access
 7. Redirects to home page
 
-### API Proxy Pattern
+### Direct API Access Pattern
 
-All Plex API calls route through SvelteKit server endpoints to keep tokens secure:
-
-- **Route**: `/api/plex/[...path]/+server.ts`
-- **Purpose**: Proxies requests to Plex server with authentication
-- **Environment-aware**: Uses `plexServerUrlLocal` in dev, `plexServerUrlRemote` in production
-- **Caching**: Smart cache durations based on endpoint type
-  - Libraries: 10 minutes
-  - Library contents: 30 minutes
-  - Active sessions: no cache
-  - Metadata: 2 hours
-
-### Image Handling
-
-Images are hot-linked directly from the Plex server to minimize bandwidth usage:
+All Plex API calls and images are fetched directly from the Plex server to minimize bandwidth usage:
 
 - **Server Data**: `+layout.server.ts` exposes `plexToken` and `plexServerUrl` to client
-- **Usage**: `<img src="{plexServerUrl}{thumbPath}?X-Plex-Token={token}" />`
-- **Benefits**: Eliminates server-side image proxy overhead, reduces Vercel bandwidth costs
-- **Security**: Token is visible in image URLs but protected by HTTPS in production
+- **API Usage**: `fetch(\`\${plexServerUrl}/library/sections?X-Plex-Token=\${plexToken}\`)`
+- **Image Usage**: `<img src="{plexServerUrl}{thumbPath}?X-Plex-Token={token}" />`
+- **Benefits**:
+  - Eliminates all server-side proxy overhead
+  - Drastically reduces Vercel bandwidth costs
+  - Faster response times (no intermediate proxy)
+  - Simpler architecture
+- **Security**: Token is visible in URLs but protected by HTTPS in production
+- **CORS**: Plex servers allow cross-origin requests when token is provided
 
 ## Key Features
 
@@ -113,8 +106,6 @@ src/
 │   ├── auth/callback/
 │   │   ├── +page.svelte
 │   │   └── +page.server.ts        # Auth callback handler
-│   ├── api/
-│   │   └── plex/[...path]/+server.ts # Main API proxy
 │   └── library/[id]/
 │       ├── +page.svelte           # Library browser
 │       ├── MovieRow.svelte        # Movie table row component
@@ -122,7 +113,8 @@ src/
 │       ├── stats/+page.svelte     # Library statistics
 │       └── show/[showId]/+page.svelte # Show details
 ├── components/
-│   └── Header.svelte              # Navigation header
+│   ├── Header.svelte              # Navigation header
+│   └── VirtualList.svelte         # Virtual scrolling for large lists
 └── app.html                       # HTML template
 ```
 
@@ -150,14 +142,17 @@ pnpm run lint           # Lint check
 ## Important Notes
 
 ### Security
-- **Never expose Plex tokens to client**: All API calls use server-side proxy
-- Cookies are HTTP-only, secure (in production), and SameSite strict
+- **Plex token exposure**: Token is exposed to client for direct API calls and images
+- Token is only transmitted over HTTPS in production
+- Cookies storing token/URL are HTTP-only, secure (in production), and SameSite strict
 - Client ID is generated once and persisted in cookies
+- This is a standard pattern for client-side Plex applications
 
 ### Performance
 - Implement lazy loading for detailed metadata (only fetch when needed)
 - Use percentile calculations cached per-filter to avoid recalculation
-- Smart caching strategy in API proxy reduces Plex server load
+- Virtual scrolling for large movie libraries (VirtualList component)
+- Direct API calls eliminate proxy latency
 
 ### Plex API Endpoints Used
 - `GET /api/v2/pins` - Create auth PIN

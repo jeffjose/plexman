@@ -89,7 +89,8 @@
 				throw new Error('Not authenticated');
 			}
 			const response = await fetch(
-				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`
+				`${plexServerUrl}/library/sections?X-Plex-Token=${plexToken}`,
+				{ headers: { Accept: 'application/json' } }
 			);
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch libraries';
@@ -124,7 +125,9 @@
 				includePreferences: '1',
 				'X-Plex-Token': plexToken
 			});
-			const response = await fetch(`${plexServerUrl}/library/sections/${id}/all?${params.toString()}`);
+			const response = await fetch(`${plexServerUrl}/library/sections/${id}/all?${params.toString()}`, {
+				headers: { Accept: 'application/json' }
+			});
 
 			if (!response.ok) {
 				let errorMsg = 'Failed to fetch media';
@@ -156,7 +159,9 @@
 				includePreferences: '1',
 				'X-Plex-Token': plexToken
 			});
-			const response = await fetch(`${plexServerUrl}/library/metadata/${ratingKey}?${params.toString()}`);
+			const response = await fetch(`${plexServerUrl}/library/metadata/${ratingKey}?${params.toString()}`, {
+				headers: { Accept: 'application/json' }
+			});
 
 			if (!response.ok) {
 				console.warn(`Failed to fetch detailed metadata for ${ratingKey}: ${response.status}`);
