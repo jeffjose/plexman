@@ -39,7 +39,7 @@
 	let isSearching = $state(false);
 	let showResults = $state(false);
 	let searchInput: HTMLInputElement;
-	let selectedIndex = $state(-1);
+	let selectedIndex = $state(0);
 
 	async function performSearch(query: string) {
 		if (!query.trim()) {
