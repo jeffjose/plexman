@@ -119,6 +119,8 @@
 		onsync={() => sync.run()}
 		servers={data.servers}
 		serverScope={data.serverScope}
+		viewers={data.viewers}
+		userScope={data.userScope}
 	/>
 
 	{#if sync.message}

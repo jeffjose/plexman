@@ -33,8 +33,8 @@
 		if (!episode.airDate) return 'no date announced';
 		if (episode.status !== 'upcoming') return relativeDay(episode.airDate, today);
 
-		// Nothing further out than a fortnight reaches this list, so days are the
-		// only unit worth naming.
+		// Nothing further out than a week reaches this list, so days are the only
+		// unit worth naming.
 		const days = episode.daysUntil ?? 0;
 		if (days <= 0) return 'today';
 		if (days === 1) return 'tomorrow';

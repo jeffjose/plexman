@@ -11,12 +11,23 @@
 
 import { and, eq, gte, lte, inArray, desc, sql, like, or, type SQL } from 'drizzle-orm';
 import { db } from '../db';
-import { history } from '../db/schema';
+import { history, servers } from '../db/schema';
 import { dayKeyInZone } from '$lib/activity/dates';
 import type { MediaType, TimelineItem } from '$lib/activity/types';
 import { normalizeType } from '$lib/activity/types';
 
+/**
+ * Whose history to include.
+ *
+ * `null` means the signed-in user on every server, which is resolved from
+ * `servers.serverAccountId` rather than hardcoded — the owner is id 1 on one
+ * server and something else on the next. `'all'` drops the restriction, and an
+ * explicit `serverId:accountId` pins it to one person on one server.
+ */
+export type ViewerScope = string | null;
+
 export interface ActivityFilters {
+	viewer?: ViewerScope;
 	types?: MediaType[];
 	serverIds?: string[];
 	/** Inclusive unix-second bounds. */
@@ -27,6 +38,31 @@ export interface ActivityFilters {
 
 function buildFilters(accountId: number, filters: ActivityFilters): SQL | undefined {
 	const clauses: (SQL | undefined)[] = [eq(history.accountId, accountId)];
+
+	/*
+	 * Viewer restriction, expressed on the (server, server-account) pair.
+	 *
+	 * A bare `serverAccountId IN (…)` would be wrong: local ids are only unique
+	 * within a server, so "account 1" matches the owner on one server and a
+	 * different person on another.
+	 */
+	if (filters.viewer === undefined || filters.viewer === null) {
+		clauses.push(
+			sql`(${history.serverId}, ${history.serverAccountId}) IN (
+				SELECT ${servers.clientIdentifier}, ${servers.serverAccountId}
+				FROM ${servers}
+				WHERE ${servers.accountId} = ${accountId} AND ${servers.serverAccountId} IS NOT NULL
+			)`
+		);
+	} else if (filters.viewer !== 'all') {
+		const [viewerServer, viewerAccount] = filters.viewer.split(':');
+		const parsed = Number(viewerAccount);
+		clauses.push(
+			Number.isFinite(parsed)
+				? and(eq(history.serverId, viewerServer), eq(history.serverAccountId, parsed))
+				: sql`1 = 0`
+		);
+	}
 
 	if (filters.types?.length) {
 		// 'other' is a UI bucket, not a Plex type: it means "anything that isn't

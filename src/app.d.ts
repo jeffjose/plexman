@@ -14,6 +14,9 @@ declare global {
 			 *  Resolved once in hooks so every page and endpoint agrees, and
 			 *  remembered across sessions. */
 			serverScope: string[];
+			/** Whose activity to show: `serverId:serverAccountId`, the string `all`,
+			 *  or null for the signed-in user. Remembered across sessions. */
+			userScope: string | null;
 		}
 	}
 }

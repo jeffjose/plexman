@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { servers } from '$lib/server/db/schema';
+import { getViewers } from '$lib/server/queries/users';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
@@ -19,9 +20,13 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 				.orderBy(servers.name)
 		: [];
 
+	const viewers = locals.account ? await getViewers(locals.account.id, locals.serverScope) : [];
+
 	return {
 		timeZone: locals.timeZone,
 		servers: knownServers,
+		viewers,
+		userScope: locals.userScope,
 		// Resolved in hooks from the URL or the stored preference, so the selector
 		// shows what's actually being queried rather than what the URL happens to
 		// say.

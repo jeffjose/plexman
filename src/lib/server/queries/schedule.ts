@@ -27,10 +27,11 @@ const MAX_CANONICAL_ROWS = 40_000;
  * How far ahead "upcoming" reaches, in days.
  *
  * Long-running shows publish a whole season's dates at once, so without a limit
- * the list fills with episodes months out that nothing can be done about. Two
- * weeks is roughly the horizon over which an air date is actionable.
+ * the list fills with episodes months out that nothing can be done about. A week
+ * covers the next instalment of anything on a weekly cadence, which is the only
+ * thing worth being told about in advance.
  */
-const UPCOMING_HORIZON_DAYS = 14;
+const UPCOMING_HORIZON_DAYS = 7;
 
 export type EpisodeStatus = 'held' | 'missing' | 'upcoming';
 

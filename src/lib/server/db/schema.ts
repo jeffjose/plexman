@@ -260,6 +260,7 @@ export const libraryItems = sqliteTable(
  * change has to touch.
  */
 export * from './schema/shows';
+export * from './schema/users';
 
 export type Account = typeof accounts.$inferSelect;
 export type LibrarySection = typeof librarySections.$inferSelect;

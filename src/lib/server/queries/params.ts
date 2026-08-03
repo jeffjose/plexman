@@ -19,9 +19,10 @@ export function parseActivityFilters(
 	timeZone: string,
 	/** Resolved in hooks — see `locals.serverScope`. Passed in rather than read
 	 *  from the URL because it also comes from a stored preference. */
-	serverScope: string[] = []
+	serverScope: string[] = [],
+	viewer: string | null = null
 ): ActivityFilters {
-	const filters: ActivityFilters = {};
+	const filters: ActivityFilters = { viewer };
 
 	const types = params
 		.getAll('type')

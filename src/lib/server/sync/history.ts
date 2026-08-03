@@ -18,6 +18,8 @@ import {
 	type ServerTarget
 } from '../plex/server';
 import { HISTORY_PAGE_SIZE } from '../plex/constants';
+import type { PlexServerAccount } from '../plex/types';
+import { serverAccounts } from '../db/schema';
 import type { PlexHistoryEntry } from '../plex/types';
 
 export interface ServerSyncResult {
@@ -122,6 +124,73 @@ function toRow(
 	};
 }
 
+/**
+ * Stores the server's user roster so the activity views can name people.
+ *
+ * The signed-in account is always recorded even when the roster is empty — a
+ * shared server won't enumerate its users, but you're demonstrably one of them,
+ * and the picker needs at least that row to have something to select.
+ */
+async function recordServerAccounts(
+	serverId: string,
+	roster: PlexServerAccount[],
+	selfId: number | null,
+	account: Account
+): Promise<void> {
+	const now = Math.floor(Date.now() / 1000);
+
+	const rows = roster
+		.filter((entry) => typeof entry.id === 'number')
+		.map((entry) => ({
+			serverId,
+			accountId: entry.id,
+			name: entry.name ?? null,
+			thumb: entry.thumb ?? null,
+			isSelf: selfId != null && entry.id === selfId,
+			updatedAt: now
+		}));
+
+	if (selfId != null && !rows.some((row) => row.accountId === selfId)) {
+		rows.push({
+			serverId,
+			accountId: selfId,
+			name: account.username,
+			thumb: account.thumb,
+			isSelf: true,
+			updatedAt: now
+		});
+	}
+
+	if (rows.length === 0) return;
+
+	await db
+		.insert(serverAccounts)
+		.values(rows)
+		.onConflictDoUpdate({
+			target: [serverAccounts.serverId, serverAccounts.accountId],
+			set: {
+				name: sql`excluded.name`,
+				thumb: sql`excluded.thumb`,
+				isSelf: sql`excluded.is_self`,
+				updatedAt: sql`excluded.updated_at`
+			}
+		});
+}
+
+/** Refreshes each user's row count so the picker can hide accounts that exist
+ *  but have never watched anything. */
+async function refreshHistoryCounts(serverId: string): Promise<void> {
+	await db.run(sql`
+		UPDATE ${serverAccounts}
+		SET ${sql.raw('history_count')} = COALESCE((
+			SELECT COUNT(*) FROM ${history}
+			WHERE ${history.serverId} = ${serverAccounts.serverId}
+			  AND ${history.serverAccountId} = ${serverAccounts.accountId}
+		), 0)
+		WHERE ${serverAccounts.serverId} = ${serverId}
+	`);
+}
+
 async function newestViewedAt(serverId: string, accountId: number): Promise<number> {
 	const [row] = await db
 		.select({ viewedAt: history.viewedAt })
@@ -160,14 +229,30 @@ async function syncServer(
 	try {
 		const baseUrl = await resolveBaseUrl(target);
 
-		let serverAccountId = server.serverAccountId;
-		if (serverAccountId == null) {
-			// Only owned servers are ever stored (see sync/servers.ts), so
-			// `/accounts` is readable here — a 403 would be a real fault and should
-			// surface as a sync error rather than be worked around.
-			const serverAccounts = await getServerAccounts(baseUrl, target);
-			serverAccountId = matchServerAccount(serverAccounts, account.id, account.username);
+		// `/accounts` is admin-only, so this succeeds on servers you own and 403s
+		// on ones merely shared with you. Both are fine: a shared server can only
+		// ever show you your own history anyway.
+		let roster: PlexServerAccount[] = [];
+		try {
+			roster = await getServerAccounts(baseUrl, target);
+		} catch (error) {
+			if (server.owned) throw error;
 		}
+
+		const serverAccountId =
+			server.serverAccountId ?? matchServerAccount(roster, account.id, account.username);
+
+		await recordServerAccounts(server.clientIdentifier, roster, serverAccountId, account);
+
+		/*
+		 * On a server you own, pull every user's history rather than just your own.
+		 *
+		 * The activity views default to you, so this changes nothing on screen
+		 * until a user is picked — but the data has to already be there for the
+		 * picker to have anything to offer, and back-filling someone else's history
+		 * later would mean a second full walk.
+		 */
+		const accountFilter = server.owned ? null : serverAccountId;
 
 		// Re-fetch the last hour on incremental runs. `viewedAt>` is exclusive and
 		// a view can land in the same second as the watermark, so an exact
@@ -182,7 +267,7 @@ async function syncServer(
 
 		while (start < total && result.scanned < MAX_ROWS_PER_SYNC) {
 			const page = await fetchHistoryPage(baseUrl, target, {
-				serverAccountId,
+				serverAccountId: accountFilter,
 				viewedAfter: watermark > 0 ? watermark : undefined,
 				start,
 				size: HISTORY_PAGE_SIZE
@@ -238,6 +323,8 @@ async function syncServer(
 		// Self-heal: drop anything stored before this rule existed, or admitted
 		// under an earlier one. Without it a bad row synced yesterday would sit in
 		// the calendar forever, since an incremental sync never revisits it.
+		await refreshHistoryCounts(server.clientIdentifier);
+
 		const purged = await db
 			.delete(history)
 			.where(

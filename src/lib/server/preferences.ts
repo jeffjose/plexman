@@ -25,3 +25,25 @@ export async function getServerScope(accountId: number): Promise<string[]> {
 export async function setServerScope(accountId: number, serverId: string | null): Promise<void> {
 	await setSetting(scopeKey(accountId), serverId ?? '');
 }
+
+/** Sentinel for "everyone on the server" — same reasoning as ALL_SERVERS. */
+export const ALL_USERS = 'all';
+
+function userKey(accountId: number): string {
+	return `scope_user:${accountId}`;
+}
+
+/**
+ * The selected viewer, as `serverId:serverAccountId`.
+ *
+ * Server-local account ids are only unique within a server, so the preference
+ * has to carry both halves — id 1 is a different person on every server.
+ */
+export async function getUserScope(accountId: number): Promise<string | null> {
+	const stored = await getSetting(userKey(accountId));
+	return stored || null;
+}
+
+export async function setUserScope(accountId: number, value: string | null): Promise<void> {
+	await setSetting(userKey(accountId), value ?? '');
+}
