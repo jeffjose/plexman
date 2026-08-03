@@ -14,21 +14,13 @@ import { dayBounds } from '$lib/activity/dates';
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * The nav's server scope, as a list of client identifiers.
- *
- * Empty means "all servers". Shared by both pages so the selector keeps its
- * meaning across a navigation between them.
- */
-export function parseServerScope(params: URLSearchParams): string[] {
-	const ids = params
-		.getAll('server')
-		.flatMap((value) => value.split(','))
-		.filter(Boolean);
-	return [...new Set(ids)];
-}
-
-export function parseActivityFilters(params: URLSearchParams, timeZone: string): ActivityFilters {
+export function parseActivityFilters(
+	params: URLSearchParams,
+	timeZone: string,
+	/** Resolved in hooks — see `locals.serverScope`. Passed in rather than read
+	 *  from the URL because it also comes from a stored preference. */
+	serverScope: string[] = []
+): ActivityFilters {
 	const filters: ActivityFilters = {};
 
 	const types = params
@@ -37,8 +29,7 @@ export function parseActivityFilters(params: URLSearchParams, timeZone: string):
 		.filter((value): value is MediaType => isMediaType(value));
 	if (types.length) filters.types = [...new Set(types)];
 
-	const scopedServers = parseServerScope(params);
-	if (scopedServers.length) filters.serverIds = scopedServers;
+	if (serverScope.length) filters.serverIds = serverScope;
 
 	const search = params.get('q');
 	if (search?.trim()) filters.search = search.trim();
@@ -70,13 +61,16 @@ export function parseActivityFilters(params: URLSearchParams, timeZone: string):
  * dimensions (media type vs library section), and merging them would mean a
  * union type that every caller has to narrow anyway.
  */
-export function parseLibraryFilters(params: URLSearchParams, timeZone: string): LibraryFilters {
+export function parseLibraryFilters(
+	params: URLSearchParams,
+	timeZone: string,
+	serverScope: string[] = []
+): LibraryFilters {
 	const filters: LibraryFilters = {};
 
 	// `server` is the nav's scope selector, shared with the Activity page so the
 	// two read the same parameter and stay in step across a navigation.
-	const scopedServers = parseServerScope(params);
-	if (scopedServers.length) filters.serverIds = scopedServers;
+	if (serverScope.length) filters.serverIds = serverScope;
 
 	const sections = params
 		.getAll('section')

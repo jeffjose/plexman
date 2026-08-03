@@ -45,7 +45,12 @@
 </script>
 
 <div class="mx-auto min-h-svh w-full max-w-5xl px-4 pb-24 sm:px-6">
-	<Nav syncing={sync.syncing} onsync={() => sync.run()} servers={data.servers} />
+	<Nav
+		syncing={sync.syncing}
+		onsync={() => sync.run()}
+		servers={data.servers}
+		serverScope={data.serverScope}
+	/>
 
 	{#if sync.message}
 		<p

@@ -9,7 +9,7 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.account) redirect(303, '/login');
 
-	const filters = parseActivityFilters(url.searchParams, locals.timeZone);
+	const filters = parseActivityFilters(url.searchParams, locals.timeZone, locals.serverScope);
 
 	// Selecting a day narrows the timeline but deliberately not the heatmap:
 	// collapsing the calendar to the single day the user just clicked would

@@ -22,6 +22,10 @@ export const load: LayoutServerLoad = async ({ locals }) => {
 	return {
 		timeZone: locals.timeZone,
 		servers: knownServers,
+		// Resolved in hooks from the URL or the stored preference, so the selector
+		// shows what's actually being queried rather than what the URL happens to
+		// say.
+		serverScope: locals.serverScope,
 		account: locals.account
 			? {
 					id: locals.account.id,

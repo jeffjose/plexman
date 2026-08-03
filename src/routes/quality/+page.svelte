@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import Nav from '$lib/components/Nav.svelte';
 	import MediaMix from '$lib/components/quality/MediaMix.svelte';
+	import FitBand from '$lib/components/quality/FitBand.svelte';
 	import QualityTiers from '$lib/components/quality/QualityTiers.svelte';
 	import QualityTrend from '$lib/components/quality/QualityTrend.svelte';
 	import StorageGrowth from '$lib/components/quality/StorageGrowth.svelte';
@@ -113,7 +114,12 @@
 </script>
 
 <div class="mx-auto min-h-svh w-full max-w-5xl px-4 pb-24 sm:px-6">
-	<Nav syncing={sync.syncing} onsync={() => sync.run()} servers={data.servers} />
+	<Nav
+		syncing={sync.syncing}
+		onsync={() => sync.run()}
+		servers={data.servers}
+		serverScope={data.serverScope}
+	/>
 
 	{#if sync.message}
 		<p
@@ -208,6 +214,8 @@
 		{/if}
 
 		<div class="mt-6 flex flex-col gap-4">
+			<FitBand fit={data.fit} />
+
 			<QualityTiers
 				tiers={data.overview.tiers}
 				unranked={data.overview.unranked}
@@ -224,6 +232,26 @@
 				sections={data.overview.sections}
 				{sectionLabels}
 				totalBytes={data.overview.totalBytes}
+			/>
+
+			<WorklistTable
+				title="Too big for what it is"
+				description="Above the band, fattest first — the clearest space to win back"
+				caveat="Saving shown is the space above the top of the band, not a promise: the real figure depends on the source."
+				items={data.fit.worst}
+				{sectionLabels}
+				kind="reencode"
+				emptyMessage="Nothing is sitting above the band."
+			/>
+
+			<WorklistTable
+				title="Too thin for the resolution"
+				description="Below the band, worst first — candidates for a better copy"
+				caveat="Low bitrate for the pixel count usually means a heavily compressed source. It can also mean a clean animation encode that genuinely needs less."
+				items={data.fit.best}
+				{sectionLabels}
+				kind="reencode"
+				emptyMessage="Nothing is sitting below the band."
 			/>
 
 			<WorklistTable

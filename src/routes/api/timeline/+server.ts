@@ -7,7 +7,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 	if (!locals.account) error(401, 'Not signed in');
 
 	const page = await getTimeline(locals.account.id, {
-		...parseActivityFilters(url.searchParams, locals.timeZone),
+		...parseActivityFilters(url.searchParams, locals.timeZone, locals.serverScope),
 		cursor: url.searchParams.get('cursor') ?? undefined,
 		limit: Math.min(Number(url.searchParams.get('limit')) || 50, 200)
 	});

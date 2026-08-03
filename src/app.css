@@ -85,6 +85,12 @@
 	--type-episode: oklch(0.78 0.16 78);
 	--type-track: oklch(0.74 0.16 330);
 	--type-other: oklch(0.7 0.02 250);
+
+	/* Schedule states. `held` is the only green in the app, so a tick reads as
+	   "got it" without needing a label; `hole` borrows the destructive hue
+	   because an interior gap is the one absence that indicates a fault. */
+	--held: oklch(0.72 0.17 152);
+	--hole: oklch(0.68 0.19 25);
 }
 
 @theme inline {

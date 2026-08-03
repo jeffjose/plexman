@@ -600,3 +600,176 @@ export async function getDuplicates(
 		savingBytes: Math.round(((row.fileSize ?? 0) * (row.versionCount - 1)) / row.versionCount)
 	}));
 }
+
+/* ------------------------------------------------------------------------- *
+ * Fit: is a file the right size for what it is?
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Bitrate normalised for resolution and codec, in kbps per megapixel.
+ *
+ * Raw bitrate can't answer "is this overkill" on its own — 8 Mbps is generous
+ * for 720p and thin for 4K. Dividing by pixel count puts every resolution on
+ * one scale, and multiplying by a codec factor puts every codec on it too: HEVC
+ * reaching a given quality at roughly 60% of H.264's bitrate means an HEVC file
+ * has to be scored as though it were the larger H.264 file it replaces,
+ * otherwise every re-encode would read as "too low".
+ *
+ * The factors are quality-equivalence multipliers relative to H.264. They are
+ * rules of thumb, not measurements, which is why the bands around them are wide.
+ */
+const CODEC_EFFICIENCY: Record<string, number> = {
+	av1: 2.0,
+	hevc: 1.7,
+	h265: 1.7,
+	x265: 1.7,
+	vp9: 1.5,
+	h264: 1.0,
+	avc: 1.0,
+	avc1: 1.0,
+	x264: 1.0,
+	vc1: 0.8,
+	mpeg4: 0.7,
+	msmpeg4: 0.7,
+	mpeg2video: 0.5
+};
+
+/**
+ * Band edges in H.264-equivalent kbps per megapixel.
+ *
+ * Anchored on the widely used targets for H.264 — roughly 8–12 Mbps at 1080p,
+ * 4–6 at 720p, 35–45 at 4K — which all land near 4–6 kbps per megapixel once
+ * normalised, so a single pair of thresholds covers every resolution. The band
+ * is deliberately wider than those targets: the aim is to catch files that are
+ * obviously wrong, not to relitigate every encode.
+ */
+export const FIT_BANDS = { low: 2500, high: 7500 } as const;
+
+export type FitVerdict = 'starved' | 'good' | 'overkill';
+
+export interface FitBucket {
+	verdict: FitVerdict;
+	items: number;
+	bytes: number;
+}
+
+export interface FitReport {
+	buckets: FitBucket[];
+	/** Items with enough information to judge — the denominator for the shares. */
+	scored: number;
+	/** Video items skipped because bitrate or dimensions were missing. */
+	unscored: number;
+	worst: QualityItem[];
+	best: QualityItem[];
+	bands: { low: number; high: number };
+}
+
+function fitOf(row: {
+	bitrate: number | null;
+	width: number | null;
+	height: number | null;
+	videoCodec: string | null;
+}): { score: number; verdict: FitVerdict } | null {
+	if (!row.bitrate || !row.width || !row.height) return null;
+
+	const megapixels = (row.width * row.height) / 1_000_000;
+	if (megapixels <= 0) return null;
+
+	const efficiency = CODEC_EFFICIENCY[(row.videoCodec ?? '').toLowerCase()] ?? 1;
+	const score = (row.bitrate * efficiency) / megapixels;
+
+	return {
+		score,
+		verdict: score < FIT_BANDS.low ? 'starved' : score > FIT_BANDS.high ? 'overkill' : 'good'
+	};
+}
+
+/**
+ * Splits the library into too-small, about-right and too-large.
+ *
+ * Scored in JS rather than SQL because the normalisation needs a per-codec
+ * lookup and a division that SQLite would have to express as a long CASE — and
+ * the same rows are already being read for the worklists.
+ *
+ * Only video is considered. Audio has no pixel count, so the whole measure is
+ * meaningless for it.
+ */
+export async function getFitReport(
+	accountId: number,
+	filters: QualityFilters = {},
+	limit = 15
+): Promise<FitReport> {
+	const rows = await db
+		.select({
+			...WORKLIST_COLUMNS,
+			width: libraryItems.width,
+			height: libraryItems.height
+		})
+		.from(libraryItems)
+		.where(and(scope(accountId, filters), inArray(libraryItems.type, ['movie', 'episode'])));
+
+	const buckets: Record<FitVerdict, FitBucket> = {
+		starved: { verdict: 'starved', items: 0, bytes: 0 },
+		good: { verdict: 'good', items: 0, bytes: 0 },
+		overkill: { verdict: 'overkill', items: 0, bytes: 0 }
+	};
+
+	let unscored = 0;
+	const scored: { row: (typeof rows)[number]; score: number; verdict: FitVerdict }[] = [];
+
+	for (const row of rows) {
+		const fit = fitOf(row);
+		if (!fit) {
+			unscored++;
+			continue;
+		}
+		buckets[fit.verdict].items++;
+		buckets[fit.verdict].bytes += row.fileSize ?? 0;
+		scored.push({ row, score: fit.score, verdict: fit.verdict });
+	}
+
+	const toItem = (entry: (typeof scored)[number]): QualityItem => {
+		const { title, subtitle } = label(entry.row);
+		const size = entry.row.fileSize ?? 0;
+		// For an overkill file the recoverable space is what sits above the top of
+		// the band; a starved file has nothing to recover, so the figure is zero
+		// rather than a negative pretending to be a saving.
+		const excess = Math.max(0, 1 - FIT_BANDS.high / entry.score);
+
+		return {
+			id: `${entry.row.serverId}:${entry.row.ratingKey}`,
+			sectionId: `${entry.row.serverId}:${entry.row.sectionKey}`,
+			title,
+			subtitle,
+			fileSize: size,
+			bitrate: entry.row.bitrate,
+			videoCodec: entry.row.videoCodec,
+			videoResolution: entry.row.videoResolution,
+			versionCount: entry.row.versionCount,
+			savingBytes: entry.verdict === 'overkill' ? Math.round(size * excess) : 0
+		};
+	};
+
+	// Worst offenders both ways: the fattest files above the band (most space to
+	// win back) and the thinnest below it (worst to actually watch).
+	const overkill = scored
+		.filter((entry) => entry.verdict === 'overkill')
+		.sort((a, b) => (b.row.fileSize ?? 0) - (a.row.fileSize ?? 0))
+		.slice(0, limit)
+		.map(toItem);
+
+	const starved = scored
+		.filter((entry) => entry.verdict === 'starved')
+		.sort((a, b) => a.score - b.score)
+		.slice(0, limit)
+		.map(toItem);
+
+	return {
+		buckets: [buckets.overkill, buckets.good, buckets.starved],
+		scored: scored.length,
+		unscored,
+		worst: overkill,
+		best: starved,
+		bands: { low: FIT_BANDS.low, high: FIT_BANDS.high }
+	};
+}

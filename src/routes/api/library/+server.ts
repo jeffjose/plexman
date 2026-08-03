@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		parseCountMode(url.searchParams),
 		locals.timeZone,
 		{
-			...parseLibraryFilters(url.searchParams, locals.timeZone),
+			...parseLibraryFilters(url.searchParams, locals.timeZone, locals.serverScope),
 			cursor: url.searchParams.get('cursor') ?? undefined,
 			limit: Math.min(Number(url.searchParams.get('limit')) || 60, 200)
 		}

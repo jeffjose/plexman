@@ -11,11 +11,16 @@
 		syncing: boolean;
 		onsync: () => void;
 		servers: { id: string; name: string; owned: boolean }[];
+		/** Resolved scope from the layout — the URL may be silent while a stored
+		 *  preference is in force, and the selector must show what's really
+		 *  being queried. */
+		serverScope: string[];
 	}
 
-	let { syncing, onsync, servers }: Props = $props();
+	let { syncing, onsync, servers, serverScope }: Props = $props();
 
-	const selectedServer = $derived(page.url.searchParams.get('server') ?? '');
+	/** Empty string is the UI's "all servers"; the wire sentinel is `all`. */
+	const selectedServer = $derived(serverScope[0] ?? '');
 
 	/**
 	 * Nav links carry the current scope.
@@ -29,7 +34,7 @@
 		{ path: '/library', label: 'Library' },
 		{ path: '/quality', label: 'Quality' },
 		{ path: '/unfinished', label: 'Unfinished' },
-		{ path: '/missing', label: 'Missing' }
+		{ path: '/schedule', label: 'Schedule' }
 	] as const;
 
 	type NavPath = (typeof NAV_LINKS)[number]['path'];
@@ -46,8 +51,9 @@
 	function selectServer(value: string) {
 		const next = new URL(page.url);
 
-		if (value) next.searchParams.set('server', value);
-		else next.searchParams.delete('server');
+		// `all` is sent explicitly: an absent parameter means "keep what you
+		// remembered", so it could never express a choice to widen the scope.
+		next.searchParams.set('server', value || 'all');
 
 		// Scope changes what's being counted, so the day selection and the paging
 		// cursor from the previous scope no longer mean anything.

@@ -10,6 +10,10 @@ declare global {
 			/** IANA zone used to bucket history into local days. Comes from a cookie
 			 *  the client sets on first paint; falls back to the server's zone. */
 			timeZone: string;
+			/** Servers the current view is limited to; empty means all of them.
+			 *  Resolved once in hooks so every page and endpoint agrees, and
+			 *  remembered across sessions. */
+			serverScope: string[];
 		}
 	}
 }
