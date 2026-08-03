@@ -79,6 +79,40 @@ function groupOf(entry: PlexLibraryEntry, leafType: string): { key: string; titl
 	};
 }
 
+/**
+ * File characteristics for an item.
+ *
+ * Plex includes `Media`/`Part` in the library listing already, so this is free —
+ * we were parsing and discarding it. The *first* media entry is treated as the
+ * representative one (Plex orders them best-first) while `fileSize` sums every
+ * part across every version, because for "what is this costing me on disk" the
+ * duplicates are exactly the point.
+ */
+function mediaOf(entry: PlexLibraryEntry) {
+	const versions = entry.Media ?? [];
+	const primary = versions[0];
+
+	let fileSize: number | null = null;
+	for (const version of versions) {
+		for (const part of version.Part ?? []) {
+			if (typeof part.size === 'number') fileSize = (fileSize ?? 0) + part.size;
+		}
+	}
+
+	return {
+		bitrate: primary?.bitrate ?? null,
+		width: primary?.width ?? null,
+		height: primary?.height ?? null,
+		videoResolution: primary?.videoResolution ?? null,
+		videoCodec: primary?.videoCodec ?? null,
+		audioCodec: primary?.audioCodec ?? null,
+		audioChannels: primary?.audioChannels ?? null,
+		container: primary?.container ?? primary?.Part?.[0]?.container ?? null,
+		fileSize,
+		versionCount: versions.length || 1
+	};
+}
+
 function toRow(
 	entry: PlexLibraryEntry,
 	serverId: string,
@@ -110,6 +144,7 @@ function toRow(
 		duration: entry.duration ?? null,
 		originallyAvailableAt: entry.originallyAvailableAt ?? null,
 		addedAt: entry.addedAt,
+		...mediaOf(entry),
 		syncedAt
 	};
 }
@@ -189,6 +224,18 @@ async function syncSection(
 							thumb: sql`excluded.thumb`,
 							grandparentThumb: sql`excluded.grandparent_thumb`,
 							duration: sql`excluded.duration`,
+							// File characteristics change when a version is replaced or
+							// re-encoded, so unlike addedAt these must follow the source.
+							bitrate: sql`excluded.bitrate`,
+							width: sql`excluded.width`,
+							height: sql`excluded.height`,
+							videoResolution: sql`excluded.video_resolution`,
+							videoCodec: sql`excluded.video_codec`,
+							audioCodec: sql`excluded.audio_codec`,
+							audioChannels: sql`excluded.audio_channels`,
+							container: sql`excluded.container`,
+							fileSize: sql`excluded.file_size`,
+							versionCount: sql`excluded.version_count`,
 							syncedAt: sql`excluded.synced_at`
 						}
 					})

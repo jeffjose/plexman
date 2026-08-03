@@ -216,15 +216,50 @@ export const libraryItems = sqliteTable(
 		originallyAvailableAt: text('originally_available_at'),
 		/** Unix seconds, UTC. The field this whole view is built around. */
 		addedAt: integer('added_at').notNull(),
+
+		/*
+		 * File characteristics, from the `Media`/`Part` objects Plex already
+		 * includes in the library listing — this costs no extra requests, we were
+		 * simply discarding it before. All nullable: Plex omits them for items
+		 * whose file is missing or still being analysed, and a null must stay
+		 * distinguishable from a genuine zero when averaging.
+		 */
+		/** Kbps, as Plex reports it. */
+		bitrate: integer('bitrate'),
+		width: integer('width'),
+		height: integer('height'),
+		/** Plex's own label: '4k', '1080', '720', 'sd'. Kept alongside width and
+		 *  height because it's what the UI groups by and it isn't derivable — Plex
+		 *  applies its own thresholds to odd aspect ratios. */
+		videoResolution: text('video_resolution'),
+		videoCodec: text('video_codec'),
+		audioCodec: text('audio_codec'),
+		audioChannels: integer('audio_channels'),
+		container: text('container'),
+		/** Bytes, summed across the item's parts. */
+		fileSize: integer('file_size'),
+		/** How many versions of this item exist. >1 means duplicate files taking
+		 *  up space — the "multi-file detection" the old app surfaced. */
+		versionCount: integer('version_count').notNull().default(1),
+
 		syncedAt: integer('synced_at').notNull()
 	},
 	(table) => [
 		primaryKey({ columns: [table.serverId, table.ratingKey] }),
 		index('library_added_idx').on(table.addedAt),
 		index('library_section_added_idx').on(table.serverId, table.sectionKey, table.addedAt),
-		index('library_group_idx').on(table.serverId, table.groupKey)
+		index('library_group_idx').on(table.serverId, table.groupKey),
+		index('library_bitrate_idx').on(table.sectionKey, table.bitrate),
+		index('library_size_idx').on(table.sectionKey, table.fileSize)
 	]
 );
+
+/*
+ * Feature-specific tables live in their own modules and are re-exported here so
+ * Drizzle still sees one schema. Keeps this file from becoming the place every
+ * change has to touch.
+ */
+export * from './schema/shows';
 
 export type Account = typeof accounts.$inferSelect;
 export type LibrarySection = typeof librarySections.$inferSelect;

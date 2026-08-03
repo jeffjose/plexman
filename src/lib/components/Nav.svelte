@@ -24,7 +24,17 @@
 	 * to "All servers" — the selector would still read as scoped while the page
 	 * below it showed everything.
 	 */
-	function href(path: '/' | '/library'): string {
+	const NAV_LINKS = [
+		{ path: '/', label: 'Activity' },
+		{ path: '/library', label: 'Library' },
+		{ path: '/quality', label: 'Quality' },
+		{ path: '/unfinished', label: 'Unfinished' },
+		{ path: '/missing', label: 'Missing' }
+	] as const;
+
+	type NavPath = (typeof NAV_LINKS)[number]['path'];
+
+	function href(path: NavPath): string {
 		const base = resolve(path);
 		return selectedServer ? `${base}?server=${encodeURIComponent(selectedServer)}` : base;
 	}
@@ -59,7 +69,7 @@
 
 	<!-- eslint-disable svelte/no-navigation-without-resolve -->
 	<nav class="flex items-center gap-0.5">
-		{#each [{ path: '/', label: 'Activity' }, { path: '/library', label: 'Library' }] as const as link (link.path)}
+		{#each NAV_LINKS as link (link.path)}
 			{@const active = page.url.pathname === resolve(link.path)}
 			<a
 				href={href(link.path)}

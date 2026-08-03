@@ -9,6 +9,11 @@ interface SyncResponse {
 		sections: { title: string; error: string | null }[];
 		error?: string;
 	};
+	shows?: {
+		checked: number;
+		missing: number;
+		errors: string[];
+	};
 }
 
 /**
@@ -50,6 +55,16 @@ export function createSync() {
 					parts.push(`Libraries that failed: ${badSections.map((s) => s.title).join(', ')}.`);
 				}
 				if (result.library.error) parts.push(`Library sync failed: ${result.library.error}`);
+			}
+
+			if (result.shows?.checked) {
+				// Show checking is deliberately budgeted per sync, so saying how many
+				// were looked at stops "0 missing" from reading as "nothing is missing"
+				// when most shows simply weren't in this run's queue.
+				parts.push(`Checked ${result.shows.checked} shows, ${result.shows.missing} missing.`);
+			}
+			if (result.shows?.errors.length) {
+				parts.push(`${result.shows.errors.length} show lookups failed.`);
 			}
 
 			const failed = result.servers.filter((server) => server.error);

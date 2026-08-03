@@ -3,6 +3,7 @@ import { getClientId } from '$lib/server/plex/auth';
 import { syncServers } from '$lib/server/sync/servers';
 import { syncHistory } from '$lib/server/sync/history';
 import { syncLibrary } from '$lib/server/sync/library';
+import { syncShows } from '$lib/server/sync/shows';
 
 /**
  * Pulls fresh watch history and library contents from every owned server.
@@ -42,5 +43,21 @@ export const POST: RequestHandler = async ({ locals, url }) => {
 		};
 	}
 
-	return json({ ...history, library });
+	// Shows + their canonical episode lists, for missing-episode detection. Last
+	// because it reaches out to plex.tv's metadata service and is the most likely
+	// to be slow or rate-limited; a failure here must not cost the caller the
+	// history and library data already gathered above.
+	let shows;
+	try {
+		shows = await syncShows(locals.account, clientId, { full });
+	} catch (err) {
+		console.error('[plexman] show sync failed:', err);
+		shows = {
+			checked: 0,
+			missing: 0,
+			errors: [err instanceof Error ? err.message : String(err)]
+		};
+	}
+
+	return json({ ...history, library, shows });
 };

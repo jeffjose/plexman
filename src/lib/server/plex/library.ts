@@ -43,6 +43,34 @@ export function leafTypeName(sectionType: string): string {
 	return LEAF_NAME[LEAF_TYPE[sectionType]] ?? 'other';
 }
 
+export interface PlexPart {
+	id?: number;
+	key?: string;
+	/** Bytes. */
+	size?: number;
+	container?: string;
+	file?: string;
+}
+
+/**
+ * A version of an item's file. An item can have several — the same movie in
+ * 1080p and 4k — which is what makes duplicate detection possible.
+ */
+export interface PlexMedia {
+	id?: number;
+	/** Kbps. */
+	bitrate?: number;
+	width?: number;
+	height?: number;
+	/** '4k' | '1080' | '720' | 'sd' — Plex's own bucketing. */
+	videoResolution?: string;
+	videoCodec?: string;
+	audioCodec?: string;
+	audioChannels?: number;
+	container?: string;
+	Part?: PlexPart[];
+}
+
 export interface PlexLibraryEntry {
 	ratingKey?: string;
 	key?: string;
@@ -63,6 +91,7 @@ export interface PlexLibraryEntry {
 	/** Unix seconds. */
 	addedAt?: number;
 	updatedAt?: number;
+	Media?: PlexMedia[];
 }
 
 export async function getLibrarySections(
