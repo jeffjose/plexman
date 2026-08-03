@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- solar:tv-bold-duotone, in Plex amber: the app's own `plex` token,
+       oklch(0.78 0.16 78). The glyph is drawn on a 24-unit grid; the
+       transform scales it to fill the 32px frame with a 1px margin. -->
+  <g transform="translate(-2 -2.19) scale(1.5)">
+    <path fill="#efa810" fill-rule="evenodd" d="M16 6H8c-2.828 0-4.243 0-5.121.879C2 7.757 2 9.172 2 12v4c0 2.828 0 4.243.879 5.121C3.757 22 5.172 22 8 22h8z" clip-rule="evenodd"/>
+    <path fill="#efa810" fill-opacity="0.6" d="M22 12v4c0 2.828 0 4.242-.879 5.121c-.825.825-2.123.876-4.621.879H16V6h.5c2.498.003 3.796.053 4.621.878C22 7.758 22 9.171 22 12m-8.584-6l2.153-2.512a.75.75 0 0 0-1.138-.976L12 5.348L9.57 2.512a.75.75 0 0 0-1.14.976L10.585 6z"/>
+    <path fill="#efa810" d="M19 11a1 1 0 1 1 0 2a1 1 0 0 1 0-2m0 4a1 1 0 1 1 0 2a1 1 0 0 1 0-2"/>
+  </g>
+</svg>
