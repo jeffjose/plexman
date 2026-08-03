@@ -33,12 +33,12 @@
 		if (!episode.airDate) return 'no date announced';
 		if (episode.status !== 'upcoming') return relativeDay(episode.airDate, today);
 
+		// Nothing further out than a fortnight reaches this list, so days are the
+		// only unit worth naming.
 		const days = episode.daysUntil ?? 0;
 		if (days <= 0) return 'today';
 		if (days === 1) return 'tomorrow';
-		if (days < 7) return `in ${days} days`;
-		if (days < 30) return `in ${Math.round(days / 7)} weeks`;
-		return `in ${Math.round(days / 30)} months`;
+		return `in ${days} days`;
 	}
 </script>
 
@@ -53,12 +53,13 @@
 		>
 			<StatusMark status={episode.status} gap={episode.gap} />
 
-			<!-- Upcoming rows get a dashed frame so an unaired episode stays legible
-			     as "not yet" even when the marker is out of the eye's path. -->
+			<!-- Unaired posters are dimmed rather than outlined. A dashed frame at
+			     this size renders as a scatter of pixels, the same reason the marker
+			     stopped using one. -->
 			<div
 				class="relative size-10 shrink-0 overflow-hidden rounded-md bg-muted {episode.status ===
 				'upcoming'
-					? 'border border-dashed border-muted-foreground/40'
+					? 'opacity-60'
 					: ''}"
 			>
 				{#if poster}

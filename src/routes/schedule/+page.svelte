@@ -66,7 +66,7 @@
 		{ label: 'On the server', value: counts.held.toLocaleString(), tone: 'held' },
 		{ label: 'Missing', value: counts.missing.toLocaleString(), tone: 'plain' },
 		{ label: 'Gaps inside seasons', value: counts.holes.toLocaleString(), tone: 'hole' },
-		{ label: 'Still to air', value: counts.upcoming.toLocaleString(), tone: 'plain' }
+		{ label: 'Airing in 2 weeks', value: counts.upcoming.toLocaleString(), tone: 'plain' }
 	]);
 </script>
 

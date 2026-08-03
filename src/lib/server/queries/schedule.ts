@@ -23,6 +23,15 @@ import { daysBetween, todayKey } from '$lib/activity/dates';
  *  episode count; the cap exists so a runaway table can't stall a page load. */
 const MAX_CANONICAL_ROWS = 40_000;
 
+/**
+ * How far ahead "upcoming" reaches, in days.
+ *
+ * Long-running shows publish a whole season's dates at once, so without a limit
+ * the list fills with episodes months out that nothing can be done about. Two
+ * weeks is roughly the horizon over which an air date is actionable.
+ */
+const UPCOMING_HORIZON_DAYS = 14;
+
 export type EpisodeStatus = 'held' | 'missing' | 'upcoming';
 
 /**
@@ -371,6 +380,11 @@ export async function getSchedule(
 				const upcoming = airDate > today;
 				if (!upcoming) seasonSummary.aired++;
 
+				// Beyond the horizon an episode is an announcement, not something to
+				// act on, so it drops out of the list and the counts alike.
+				const daysUntil = upcoming ? daysBetween(today, airDate) : null;
+				if (upcoming && (daysUntil ?? 0) > UPCOMING_HORIZON_DAYS) continue;
+
 				let gap: GapKind | null = null;
 				if (!isHeld && !upcoming) {
 					// A season you hold nothing of is a deliberate omission, not a gap —
@@ -402,7 +416,7 @@ export async function getSchedule(
 					airDate,
 					status,
 					gap,
-					daysUntil: upcoming ? daysBetween(today, airDate) : null
+					daysUntil
 				});
 
 				if (status === 'held') {

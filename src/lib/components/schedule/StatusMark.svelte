@@ -51,10 +51,21 @@
 			</svg>
 		</span>
 	{:else if status === 'upcoming'}
-		<span
-			class="size-4 rounded-full border border-dashed border-muted-foreground/50"
+		<!-- A clock face rather than a dashed ring: at 16px a dashed border renders
+		     as an uneven scatter of pixels, and it read as a damaged circle rather
+		     than a deliberate one. Solid stroke, same circle family as the rest. -->
+		<svg
+			viewBox="0 0 16 16"
+			class="size-4 text-muted-foreground"
+			fill="none"
+			stroke="currentColor"
+			stroke-linecap="round"
+			stroke-linejoin="round"
 			aria-hidden="true"
-		></span>
+		>
+			<circle cx="8" cy="8" r="6.25" stroke-width="1.5" opacity="0.55" />
+			<path d="M8 4.5V8l2.25 1.5" stroke-width="1.5" />
+		</svg>
 	{:else if gap === 'hole'}
 		<!-- A hole is the one absence worth alarming about: you kept watching past
 		     it, so the file genuinely failed rather than simply not existing yet. -->
