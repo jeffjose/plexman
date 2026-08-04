@@ -43,6 +43,16 @@ export interface PartWatchedShow {
 	remainingMs: number | null;
 	/** Unplayed episodes that sit before the resume point. */
 	skipped: number;
+	/**
+	 * One entry per owned episode in broadcast order: true where a play exists.
+	 *
+	 * Carried as a flat sequence rather than a percentage because the *shape* is
+	 * the interesting part — a solid run that stops dead reads very differently
+	 * from a scatter with holes in it, and a bar can't tell them apart.
+	 */
+	markers: boolean[];
+	/** Index into `markers` of the episode you last played, or -1. */
+	resumeIndex: number;
 }
 
 export type DeadWeightKind = 'movie' | 'show' | 'album';

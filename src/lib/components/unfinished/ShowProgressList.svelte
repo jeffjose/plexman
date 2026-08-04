@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EpisodeStrip from './EpisodeStrip.svelte';
 	import {
 		dayKeyInZone,
 		formatDayLong,
@@ -45,7 +46,6 @@
 			{@const poster = posterUrl(show)}
 			{@const day = dayKeyInZone(show.lastViewedAt, timeZone)}
 			{@const left = show.ownedEpisodes - show.watchedEpisodes}
-			{@const percent = Math.round((show.watchedEpisodes / show.ownedEpisodes) * 100)}
 			{@const remaining = formatDuration(show.remainingMs)}
 			{@const stoppedAt = episodeCode(show.lastSeason, show.lastEpisode)}
 			{@const nextCode = show.next && episodeCode(show.next.season, show.next.episode)}
@@ -73,15 +73,18 @@
 						{/if}
 					</div>
 
-					<!-- Progress is over episodes you *own*, not over the show as it
+					<!-- A bar gives the ratio; the strip gives the shape. Whether you
+					     watched six straight and stopped, or dipped in and out across a
+					     season, is the thing that says what happened — and a percentage
+					     renders both identically.
+
+					     Progress is over episodes you *own*, not over the show as it
 					     aired: 8 of 10 owned reads very differently once you know the
 					     other twelve were never downloaded. -->
-					<div class="mt-1.5 flex items-center gap-2">
-						<div class="h-1 w-24 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-							<div class="h-full rounded-full bg-foreground/60" style="width: {percent}%"></div>
-						</div>
+					<div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+						<EpisodeStrip markers={show.markers} resumeIndex={show.resumeIndex} />
 						<span class="tabular text-xs text-muted-foreground">
-							{show.watchedEpisodes} of {show.ownedEpisodes} owned episodes
+							{show.watchedEpisodes} of {show.ownedEpisodes} owned
 						</span>
 					</div>
 
