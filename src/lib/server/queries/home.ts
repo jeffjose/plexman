@@ -12,7 +12,7 @@
  * airing next week is an announcement you can't use yet.
  */
 
-import { and, eq, gte, inArray, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, gte, inArray, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { history, libraryItems, librarySections, servers, shows } from '../db/schema';
 import { addDays, dayKeyInZone, todayKey } from '$lib/activity/dates';
@@ -84,7 +84,6 @@ export interface HomeData {
 	onAirCounts: { missing: number; held: number; upcoming: number };
 	gaps: HomeGap[];
 	gapTotal: number;
-	deadWeight: { titles: number; items: number; bytes: number | null } | null;
 	tiles: HomeTiles;
 	activityDays: DayBucket[];
 	sync: HomeSync;
@@ -153,78 +152,52 @@ export async function getHomeData(
 	const monthAgo = Math.floor(Date.now() / 1000) - 30 * 86_400;
 	const scope = unmutedScope(accountId, serverIds);
 
-	const [
-		schedule,
-		active,
-		activity,
-		fit,
-		weekAdds,
-		totals,
-		monthBytes,
-		unplayed,
-		allPlays,
-		syncRow
-	] = await Promise.all([
-		getSchedule(accountId, timeZone, { serverIds }),
-		activeShowKeys(accountId, serverIds),
-		// Twelve weeks is all the strip draws, and bounding it keeps the
-		// dashboard off a full-history scan.
-		getActivitySummary(accountId, timeZone, {
-			viewer,
-			from: Math.floor(Date.now() / 1000) - 84 * 86_400
-		}),
-		getFitReport(accountId, { serverIds }),
-		db
-			.select({
-				n: sql<number>`count(*)`,
-				bytes: sql<number | null>`sum(${libraryItems.fileSize})`
-			})
-			.from(libraryItems)
-			.where(and(scope, gte(libraryItems.addedAt, weekAgo))),
-		db
-			.select({
-				n: sql<number>`count(*)`,
-				sized: sql<number>`sum(case when ${libraryItems.fileSize} is not null then 1 else 0 end)`,
-				bytes: sql<number | null>`sum(${libraryItems.fileSize})`
-			})
-			.from(libraryItems)
-			.where(scope),
-		db
-			.select({ bytes: sql<number | null>`sum(${libraryItems.fileSize})` })
-			.from(libraryItems)
-			.where(and(scope, gte(libraryItems.addedAt, monthAgo))),
-		// Never played: no history row anywhere for this item's rating key.
-		db
-			.select({
-				items: sql<number>`count(*)`,
-				titles: sql<number>`count(distinct ${libraryItems.groupKey})`,
-				bytes: sql<number | null>`sum(${libraryItems.fileSize})`
-			})
-			.from(libraryItems)
-			.leftJoin(
-				history,
-				and(
-					eq(history.serverId, libraryItems.serverId),
-					eq(history.ratingKey, libraryItems.ratingKey)
-				)
-			)
-			.where(and(scope, isNull(history.historyKey))),
-		db
-			.select({ n: sql<number>`count(*)` })
-			.from(history)
-			.where(
-				sql`${history.serverId} IN (SELECT ${servers.clientIdentifier} FROM ${servers} WHERE ${servers.accountId} = ${accountId})`
-			),
-		db
-			.select({
-				lastSyncedAt: sql<number | null>`max(${servers.lastSyncedAt})`,
-				unowned: sql<
-					string | null
-				>`group_concat(case when ${servers.owned} = 0 then ${servers.name} end)`
-			})
-			.from(servers)
-			.where(eq(servers.accountId, accountId))
-	]);
+	const [schedule, active, activity, fit, weekAdds, totals, monthBytes, allPlays, syncRow] =
+		await Promise.all([
+			getSchedule(accountId, timeZone, { serverIds }),
+			activeShowKeys(accountId, serverIds),
+			// Twelve weeks is all the strip draws, and bounding it keeps the
+			// dashboard off a full-history scan.
+			getActivitySummary(accountId, timeZone, {
+				viewer,
+				from: Math.floor(Date.now() / 1000) - 84 * 86_400
+			}),
+			getFitReport(accountId, { serverIds }),
+			db
+				.select({
+					n: sql<number>`count(*)`,
+					bytes: sql<number | null>`sum(${libraryItems.fileSize})`
+				})
+				.from(libraryItems)
+				.where(and(scope, gte(libraryItems.addedAt, weekAgo))),
+			db
+				.select({
+					n: sql<number>`count(*)`,
+					sized: sql<number>`sum(case when ${libraryItems.fileSize} is not null then 1 else 0 end)`,
+					bytes: sql<number | null>`sum(${libraryItems.fileSize})`
+				})
+				.from(libraryItems)
+				.where(scope),
+			db
+				.select({ bytes: sql<number | null>`sum(${libraryItems.fileSize})` })
+				.from(libraryItems)
+				.where(and(scope, gte(libraryItems.addedAt, monthAgo))),
+			db
+				.select({ n: sql<number>`count(*)` })
+				.from(history)
+				.where(
+					sql`${history.serverId} IN (SELECT ${servers.clientIdentifier} FROM ${servers} WHERE ${servers.accountId} = ${accountId})`
+				),
+			db
+				.select({
+					lastSyncedAt: sql<number | null>`max(${servers.lastSyncedAt})`,
+					unowned: sql<
+						string | null
+					>`group_concat(case when ${servers.owned} = 0 then ${servers.name} end)`
+				})
+				.from(servers)
+				.where(eq(servers.accountId, accountId))
+		]);
 
 	// The strip: the window, restricted to shows still being fed.
 	const onAir = schedule.episodes
@@ -275,7 +248,6 @@ export async function getHomeData(
 		.filter((day) => day.date >= addDays(today, -6))
 		.reduce((sum, day) => sum + day.count, 0);
 
-	const unplayedRow = unplayed[0];
 	const totalsRow = totals[0];
 	const weekRow = weekAdds[0];
 
@@ -284,13 +256,6 @@ export async function getHomeData(
 		onAirCounts,
 		gaps: gaps.slice(0, MAX_GAPS),
 		gapTotal: gaps.length,
-		deadWeight: unplayedRow
-			? {
-					titles: Number(unplayedRow.titles ?? 0),
-					items: Number(unplayedRow.items ?? 0),
-					bytes: unplayedRow.bytes != null ? Number(unplayedRow.bytes) : null
-				}
-			: null,
 		tiles: {
 			watchedThisWeek,
 			streak: activity.currentStreak,

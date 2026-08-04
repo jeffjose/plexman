@@ -5,7 +5,7 @@
  * on a shared server the list is just you.
  */
 
-import { and, desc, eq, gt, inArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { serverAccounts, servers } from '../db/schema';
 
@@ -38,12 +38,21 @@ export async function getViewers(accountId: number, serverIds: string[] = []): P
 			and(
 				eq(servers.accountId, accountId),
 				serverIds.length ? inArray(serverAccounts.serverId, serverIds) : undefined,
-				// An account that exists but has never watched anything is noise in a
-				// picker — except your own, which must always be selectable.
-				or(eq(serverAccounts.isSelf, true), gt(serverAccounts.historyCount, 0))
+				/*
+				 * Everyone the server knows about, including people with no plays on
+				 * record — a share you've granted is worth seeing even when it's
+				 * unused, and "nobody has watched anything" is itself an answer.
+				 *
+				 * Account 0 is the exception: Plex reports it as an unnamed
+				 * pseudo-account rather than a person, and selecting it would filter
+				 * to nothing.
+				 */
+				gt(serverAccounts.accountId, 0)
 			)
 		)
-		.orderBy(desc(serverAccounts.isSelf), desc(serverAccounts.historyCount));
+		// Most active first, then alphabetical, so the people you'd actually pick
+		// lead and the rest stay findable.
+		.orderBy(desc(serverAccounts.historyCount), asc(serverAccounts.name));
 
 	return rows.map((row) => ({
 		id: `${row.serverId}:${row.accountId}`,

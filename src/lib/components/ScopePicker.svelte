@@ -145,7 +145,11 @@
 							{#if viewer.isSelf}
 								<span class="pl-1.5 text-[11px] text-muted-foreground">you</span>
 							{/if}
-							<span class="tabular ml-auto pl-3 text-[11px] text-muted-foreground">
+							<span
+								class="tabular ml-auto pl-3 text-[11px] {viewer.historyCount === 0
+									? 'text-muted-foreground/50'
+									: 'text-muted-foreground'}"
+							>
 								{viewer.historyCount.toLocaleString()}
 							</span>
 						</DropdownMenu.RadioItem>

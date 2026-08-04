@@ -166,24 +166,9 @@
 					{/if}
 				</section>
 
-				{#if home.deadWeight && home.deadWeight.items > 0}
-					<section class="rounded-xl border bg-card/50 p-4 sm:p-5">
-						<h2 class="mb-2 text-sm font-medium">Never played</h2>
-						<div class="tabular text-2xl font-semibold tracking-tight">
-							{sizesTrustworthy
-								? bytes(home.deadWeight.bytes)
-								: home.deadWeight.titles.toLocaleString()}
-						</div>
-						<div class="tabular mt-0.5 text-xs text-muted-foreground">
-							{#if sizesTrustworthy}
-								{home.deadWeight.titles.toLocaleString()} titles
-							{:else}
-								titles
-							{/if}
-							· {home.deadWeight.items.toLocaleString()} items
-						</div>
-					</section>
-				{/if}
+				<section class="rounded-xl border p-4 sm:p-5">
+					<ActivityStrip days={home.activityDays} timeZone={data.timeZone} weeks={8} />
+				</section>
 			</aside>
 		</div>
 
@@ -195,10 +180,6 @@
 					<div class="mt-0.5 truncate text-[11px] text-muted-foreground">{tile.hint}</div>
 				</div>
 			{/each}
-		</div>
-
-		<div class="mt-4 rounded-xl border p-4 sm:p-5">
-			<ActivityStrip days={home.activityDays} timeZone={data.timeZone} />
 		</div>
 
 		<p class="tabular mt-8 border-t pt-4 text-xs text-muted-foreground">
