@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import Nav from '$lib/components/Nav.svelte';
 	import OnAir from '$lib/components/home/OnAir.svelte';
 	import ActivityStrip from '$lib/components/home/ActivityStrip.svelte';
@@ -11,6 +10,17 @@
 	let { data }: { data: PageData } = $props();
 
 	const sync = createSync();
+
+	function gapPoster(gap: { serverId: string; thumb: string | null }): string | null {
+		if (!gap.thumb) return null;
+		const params = new URLSearchParams({
+			server: gap.serverId,
+			path: gap.thumb,
+			w: '80',
+			h: '120'
+		});
+		return `/api/image?${params}`;
+	}
 	const home = $derived(data.home);
 
 	const neverSynced = $derived(data.servers.length === 0 || home.sync.items === 0);
@@ -111,7 +121,7 @@
 
 			<aside class="flex flex-col gap-4">
 				<section class="rounded-xl border p-4 sm:p-5">
-					<div class="mb-1 flex items-baseline gap-2">
+					<div class="mb-2 flex items-baseline gap-2">
 						<h2 class="text-sm font-medium">Gaps</h2>
 						{#if home.gapTotal > 0}
 							<span class="tabular ml-auto text-xs text-muted-foreground">{home.gapTotal}</span>
@@ -119,66 +129,59 @@
 					</div>
 
 					{#if home.gapTotal === 0}
-						<p class="text-xs text-muted-foreground">Every season you're watching runs unbroken.</p>
+						<p class="text-xs text-muted-foreground">Every season runs unbroken.</p>
 					{:else}
-						<!-- Reference, not a task list. No red, no count in a tile, and the
-						     copy says outright that some of these can't be fixed — a
-						     permanent to-do you can't complete just teaches you to stop
-						     reading the page. -->
-						<p class="mb-2 text-xs text-muted-foreground">
-							Holes in seasons that otherwise run clean.
-						</p>
-						<ul class="flex flex-col gap-1.5">
+						<ul class="flex flex-col">
 							{#each home.gaps as gap (gap.id)}
-								<li class="text-xs">
-									<span class="truncate">{gap.showTitle}</span>
-									<span class="tabular text-muted-foreground">
-										S{String(gap.season).padStart(2, '0')} · {gap.episodes}
-									</span>
+								{@const poster = gapPoster(gap)}
+								<li class="flex items-center gap-2.5 rounded-lg px-1 py-1.5">
+									<div
+										class="size-10 shrink-0 overflow-hidden rounded-md bg-muted"
+										style="box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 8%, transparent)"
+									>
+										{#if poster}
+											<img
+												src={poster}
+												alt=""
+												loading="lazy"
+												decoding="async"
+												class="size-full object-cover"
+											/>
+										{/if}
+									</div>
+									<div class="min-w-0 flex-1">
+										<div class="truncate text-sm font-medium">{gap.showTitle}</div>
+										<div class="tabular truncate text-xs text-muted-foreground">
+											S{String(gap.season).padStart(2, '0')} · {gap.episodes}
+										</div>
+									</div>
 								</li>
 							{/each}
 						</ul>
 						{#if home.gapTotal > home.gaps.length}
-							<p class="mt-2 text-xs text-muted-foreground">
+							<p class="mt-1 px-1 text-xs text-muted-foreground">
 								+{home.gapTotal - home.gaps.length} more
 							</p>
 						{/if}
-						<p class="mt-2 text-[11px] text-muted-foreground">
-							Some were never going to be fixable — this is here so you know, not so you act.
-						</p>
-						<a
-							href="{resolve('/schedule')}?only=holes"
-							class="mt-2 inline-block text-xs text-muted-foreground underline-offset-4 hover:underline"
-						>
-							Schedule · gaps →
-						</a>
 					{/if}
 				</section>
 
 				{#if home.deadWeight && home.deadWeight.items > 0}
 					<section class="rounded-xl border bg-card/50 p-4 sm:p-5">
-						{#if sizesTrustworthy}
-							<div class="text-sm font-medium">
-								{bytes(home.deadWeight.bytes)} never played
-							</div>
-							<div class="tabular mt-0.5 text-xs text-muted-foreground">
-								{home.deadWeight.titles.toLocaleString()} titles · {home.deadWeight.items.toLocaleString()}
-								items
-							</div>
-						{:else}
-							<div class="tabular text-sm font-medium">
-								{home.deadWeight.titles.toLocaleString()} titles never played
-							</div>
-							<div class="tabular mt-0.5 text-xs text-muted-foreground">
-								{home.deadWeight.items.toLocaleString()} items · size unknown until a full sync
-							</div>
-						{/if}
-						<a
-							href={resolve('/unfinished')}
-							class="mt-2 inline-block text-xs text-muted-foreground underline-offset-4 hover:underline"
-						>
-							Unfinished →
-						</a>
+						<h2 class="mb-2 text-sm font-medium">Never played</h2>
+						<div class="tabular text-2xl font-semibold tracking-tight">
+							{sizesTrustworthy
+								? bytes(home.deadWeight.bytes)
+								: home.deadWeight.titles.toLocaleString()}
+						</div>
+						<div class="tabular mt-0.5 text-xs text-muted-foreground">
+							{#if sizesTrustworthy}
+								{home.deadWeight.titles.toLocaleString()} titles
+							{:else}
+								titles
+							{/if}
+							· {home.deadWeight.items.toLocaleString()} items
+						</div>
 					</section>
 				{/if}
 			</aside>

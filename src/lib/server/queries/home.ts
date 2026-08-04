@@ -38,6 +38,7 @@ export interface HomeGap {
 	serverId: string;
 	showRatingKey: string;
 	showTitle: string;
+	thumb: string | null;
 	season: number;
 	/** Compressed episode numbers, e.g. `E05` or `E02, E07`. */
 	episodes: string;
@@ -259,6 +260,7 @@ export async function getHomeData(
 			serverId: episode.serverId,
 			showRatingKey: episode.showRatingKey,
 			showTitle: episode.showTitle,
+			thumb: episode.thumb,
 			season: episode.season,
 			episodes: '',
 			numbers: [episode.episode]
