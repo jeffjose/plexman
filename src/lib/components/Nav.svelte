@@ -28,7 +28,8 @@
 	let { syncing, onsync, servers, serverScope, viewers, userScope }: Props = $props();
 
 	const NAV_LINKS = [
-		{ path: '/', label: 'Activity' },
+		{ path: '/', label: 'Home' },
+		{ path: '/activity', label: 'Activity' },
 		{ path: '/library', label: 'Library' },
 		{ path: '/quality', label: 'Quality' },
 		{ path: '/unfinished', label: 'Unfinished' },

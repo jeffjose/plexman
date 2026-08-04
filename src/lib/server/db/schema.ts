@@ -130,7 +130,11 @@ export const history = sqliteTable(
 		primaryKey({ columns: [table.serverId, table.historyKey] }),
 		index('history_account_viewed_idx').on(table.accountId, table.viewedAt),
 		index('history_viewed_idx').on(table.viewedAt),
-		index('history_type_idx').on(table.type)
+		index('history_type_idx').on(table.type),
+		// Joining library items to their plays is the shape behind "never played"
+		// and the per-show progress rollups. Without this the anti-join degrades to
+		// a scan per item and measured 9 seconds against 52k items.
+		index('history_rating_idx').on(table.serverId, table.ratingKey)
 	]
 );
 

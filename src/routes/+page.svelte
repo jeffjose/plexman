@@ -1,133 +1,76 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
-	import Heatmap from '$lib/components/activity/Heatmap.svelte';
-	import Timeline from '$lib/components/activity/Timeline.svelte';
-	import StatsBar from '$lib/components/activity/StatsBar.svelte';
 	import Nav from '$lib/components/Nav.svelte';
+	import OnAir from '$lib/components/home/OnAir.svelte';
+	import ActivityStrip from '$lib/components/home/ActivityStrip.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import { Separator } from '$lib/components/ui/separator';
-	import { MEDIA_TYPES, TYPE_LABELS, type MediaType, type TimelineItem } from '$lib/activity/types';
-	import { formatDayLong } from '$lib/activity/dates';
+	import { formatBytes } from '$lib/components/quality/format';
 	import { createSync } from '$lib/sync.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const sync = createSync();
+	const home = $derived(data.home);
+
+	const neverSynced = $derived(data.servers.length === 0 || home.sync.items === 0);
+
+	function ago(seconds: number | null): string {
+		if (!seconds) return 'never';
+		const delta = Math.max(0, Math.floor(Date.now() / 1000) - seconds);
+		if (delta < 90) return 'just now';
+		if (delta < 3600) return `${Math.round(delta / 60)} min ago`;
+		if (delta < 86_400) return `${Math.round(delta / 3600)}h ago`;
+		return `${Math.round(delta / 86_400)}d ago`;
+	}
 
 	/**
-	 * Filters live in the URL.
-	 *
-	 * They're what the server load reads, so keeping them there means a filtered
-	 * view is shareable, survives a reload, and can't drift out of sync with the
-	 * data on screen — a local copy would have to be reconciled after every
-	 * navigation.
+	 * File sizes only exist for items a sync has walked since the media columns
+	 * were added, so a byte total can cover a small fraction of the library. Below
+	 * near-complete coverage the number is worse than useless — it looks
+	 * authoritative while understating the collection by orders of magnitude — so
+	 * it's withheld and the hint says why.
 	 */
-	const activeTypes = $derived(page.url.searchParams.getAll('type') as MediaType[]);
-	const selectedDay = $derived(page.url.searchParams.get('day'));
-	const search = $derived(page.url.searchParams.get('q') ?? '');
-	const hasFilters = $derived(activeTypes.length > 0 || Boolean(selectedDay) || Boolean(search));
-
-	function updateUrl(mutate: (params: URLSearchParams) => void) {
-		const next = new URL(page.url);
-		mutate(next.searchParams);
-		// Navigating to the page we're already on with different query params.
-		// `resolve()` exists to turn a route id into a path, which this isn't —
-		// the rule just can't tell a same-route URL object from an external one.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(next, { keepFocus: true, noScroll: true });
-	}
-
-	function toggleType(type: MediaType) {
-		updateUrl((params) => {
-			const current = params.getAll('type');
-			const next = current.includes(type)
-				? current.filter((value) => value !== type)
-				: [...current, type];
-
-			params.delete('type');
-			for (const value of next) params.append('type', value);
-		});
-	}
-
-	/** Clicking a heatmap cell scopes the timeline to that day. The server turns
-	 *  the day key into instant bounds — see `dayBounds` in queries/params.ts. */
-	function selectDay(date: string | null) {
-		updateUrl((params) => {
-			if (date) params.set('day', date);
-			else params.delete('day');
-		});
-	}
-
-	// Writable derived: mirrors the URL, but the input owns it between keystrokes
-	// so typing isn't fighting the 300ms debounce below.
-	let searchInput = $derived(search);
-
-	let searchTimer: ReturnType<typeof setTimeout>;
-	function onSearchInput(event: Event) {
-		const value = (event.currentTarget as HTMLInputElement).value;
-		clearTimeout(searchTimer);
-		// Debounced because every keystroke re-runs the load, which re-queries the
-		// whole summary.
-		searchTimer = setTimeout(() => {
-			updateUrl((params) => {
-				if (value.trim()) params.set('q', value.trim());
-				else params.delete('q');
-			});
-		}, 300);
-	}
-
-	// ---- Timeline paging ----------------------------------------------------
-
-	let extraItems = $state<TimelineItem[]>([]);
-	let cursor = $state<string | null>(null);
-	let loadingMore = $state(false);
-
-	// A filter change replaces the timeline wholesale, so pages accumulated under
-	// the old filters have to go. Keyed on the server-provided first page.
-	$effect(() => {
-		const firstPage = data.timeline;
-		extraItems = [];
-		cursor = firstPage.nextCursor;
-		loadingMore = false;
-	});
-
-	const timelineItems = $derived([...data.timeline.items, ...extraItems]);
-
-	async function loadMore() {
-		if (loadingMore || !cursor) return;
-		loadingMore = true;
-
-		// The timeline endpoint reads exactly the same filter params as the page
-		// load, so the current URL is reused verbatim with a cursor added — the
-		// two can't disagree about what's being listed. Plain URL, not SvelteURL:
-		// it's built, fetched once and dropped, and nothing tracks it.
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const request = new URL(page.url);
-		request.pathname = '/api/timeline';
-		request.searchParams.set('cursor', cursor);
-
-		try {
-			const response = await fetch(request);
-			if (!response.ok) throw new Error(`Timeline request failed: ${response.status}`);
-			const next = (await response.json()) as { items: TimelineItem[]; nextCursor: string | null };
-			extraItems = [...extraItems, ...next.items];
-			cursor = next.nextCursor;
-		} catch (error) {
-			console.error(error);
-			// Drop the cursor so the observer stops retrying; the Load more button
-			// disappears with it and a reload is the recovery path.
-			cursor = null;
-		} finally {
-			loadingMore = false;
-		}
-	}
-
-	const neverSynced = $derived(
-		data.servers.length > 0 && data.servers.every((s) => !s.lastSyncedAt)
+	const sizesTrustworthy = $derived(
+		home.tiles.totalItems > 0 && home.tiles.sizedItems / home.tiles.totalItems >= 0.9
 	);
+
+	function bytes(value: number | null): string {
+		if (value == null || !sizesTrustworthy) return '—';
+		return formatBytes(value);
+	}
+
+	const measuredHint = $derived(
+		`${home.tiles.sizedItems.toLocaleString()} of ${home.tiles.totalItems.toLocaleString()} measured · full sync`
+	);
+
+	const tiles = $derived([
+		{
+			label: 'Watched',
+			value: home.tiles.watchedThisWeek.toLocaleString(),
+			hint: home.tiles.streak > 0 ? `${home.tiles.streak}-day streak` : 'this week'
+		},
+		{
+			label: 'Added',
+			value: home.tiles.addedThisWeek.toLocaleString(),
+			hint: sizesTrustworthy ? `this week · ${bytes(home.tiles.addedBytesThisWeek)}` : 'this week'
+		},
+		{
+			label: 'On disk',
+			value: bytes(home.tiles.totalBytes),
+			hint: sizesTrustworthy
+				? `+${formatBytes(home.tiles.bytesLast30Days ?? 0)} / 30d`
+				: measuredHint
+		},
+		{
+			label: 'In band',
+			value: home.tiles.inBandPercent == null ? '—' : `${Math.round(home.tiles.inBandPercent)}%`,
+			hint:
+				home.tiles.inBandPercent == null
+					? 'no file details yet'
+					: `${Math.round(home.tiles.overkillPercent ?? 0)}% overkill · ${home.tiles.scoredItems.toLocaleString()} judged`
+		}
+	]);
 </script>
 
 <div class="mx-auto min-h-svh w-full max-w-5xl px-4 pb-24 sm:px-6">
@@ -149,113 +92,120 @@
 		</p>
 	{/if}
 
-	{#if data.servers.length === 0}
+	{#if neverSynced}
 		<div class="rounded-xl border border-dashed p-10 text-center">
-			<h2 class="font-medium">No Plex servers found</h2>
-			<p class="mx-auto mt-2 max-w-sm text-sm text-balance text-muted-foreground">
-				This account doesn't have access to any Plex Media Server, or plex.tv couldn't be reached.
-				Sync to look again.
+			<h2 class="font-medium">Nothing synced yet</h2>
+			<p class="mx-auto mt-2 max-w-md text-sm text-balance text-muted-foreground">
+				Pull your watch history and libraries to get started. The first run walks everything and
+				takes a minute or two.
 			</p>
-			<Button class="mt-5" onclick={() => sync.run()} disabled={sync.syncing}>
-				{sync.syncing ? 'Looking…' : 'Look again'}
+			<Button class="mt-5" onclick={() => sync.run(true)} disabled={sync.syncing}>
+				{sync.syncing ? 'Syncing…' : 'Sync everything'}
 			</Button>
 		</div>
-	{:else if data.summary.total === 0}
-		<div class="rounded-xl border border-dashed p-10 text-center">
-			<h2 class="font-medium">{neverSynced ? 'Nothing synced yet' : 'No activity found'}</h2>
-			<p class="mx-auto mt-2 max-w-sm text-sm text-balance text-muted-foreground">
-				{#if neverSynced}
-					Pull your watch history from {data.servers.length === 1
-						? data.servers[0].name
-						: `${data.servers.length} servers`}. The first sync walks your whole history and can
-					take a minute.
-				{:else if hasFilters}
-					Nothing matches these filters.
-				{:else}
-					Your servers reported no watch history for this account.
-				{/if}
-			</p>
-			{#if hasFilters}
-				<Button variant="outline" class="mt-5" onclick={() => goto(resolve('/'))}>
-					Clear filters
-				</Button>
-			{:else}
-				<Button class="mt-5" onclick={() => sync.run(true)} disabled={sync.syncing}>
-					{sync.syncing ? 'Syncing…' : 'Sync history'}
-				</Button>
-			{/if}
-		</div>
 	{:else}
-		<StatsBar
-			total={data.summary.total}
-			activeDays={data.summary.activeDays}
-			currentStreak={data.summary.currentStreak}
-			longestStreak={data.summary.longestStreak}
-			busiestDay={data.summary.busiestDay}
-			byType={data.summary.byType}
-		/>
-
-		<div class="mt-8 rounded-xl border p-4 sm:p-5">
-			<Heatmap
-				days={data.summary.days}
-				timeZone={data.timeZone}
-				selected={selectedDay}
-				onselect={selectDay}
-			/>
-		</div>
-
-		<div class="mt-8 flex flex-wrap items-center gap-2">
-			{#each MEDIA_TYPES as type (type)}
-				{@const active = activeTypes.includes(type)}
-				{@const count = data.summary.byType[type]}
-				<button
-					type="button"
-					onclick={() => toggleType(type)}
-					disabled={count === 0 && !active}
-					class="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40 {active
-						? 'border-transparent bg-foreground text-background'
-						: 'hover:bg-accent'}"
-					aria-pressed={active}
-				>
-					<span
-						class="size-2 rounded-full"
-						style="background-color: var(--type-{type})"
-						aria-hidden="true"
-					></span>
-					{TYPE_LABELS[type]}
-					<span class="tabular opacity-60">{count.toLocaleString()}</span>
-				</button>
-			{/each}
-
-			<input
-				type="search"
-				value={searchInput}
-				oninput={onSearchInput}
-				placeholder="Search titles…"
-				aria-label="Search watched titles"
-				class="ml-auto h-8 w-full rounded-md border border-input bg-background px-3 text-xs placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:w-56"
-			/>
-		</div>
-
-		{#if selectedDay}
-			<div class="mt-4 flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-2">
-				<span class="text-sm">
-					Showing <span class="font-medium">{formatDayLong(selectedDay)}</span>
-				</span>
-				<Button variant="ghost" size="sm" class="ml-auto h-7" onclick={() => selectDay(null)}>
-					Clear
-				</Button>
+		<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+			<div class="rounded-xl border p-4 sm:p-5">
+				<OnAir episodes={home.onAir} counts={home.onAirCounts} timeZone={data.timeZone} />
 			</div>
-		{/if}
 
-		<Separator class="mt-6 mb-2" />
+			<aside class="flex flex-col gap-4">
+				<section class="rounded-xl border p-4 sm:p-5">
+					<div class="mb-1 flex items-baseline gap-2">
+						<h2 class="text-sm font-medium">Gaps</h2>
+						{#if home.gapTotal > 0}
+							<span class="tabular ml-auto text-xs text-muted-foreground">{home.gapTotal}</span>
+						{/if}
+					</div>
 
-		<Timeline
-			items={timelineItems}
-			timeZone={data.timeZone}
-			hasMore={cursor !== null}
-			loading={loadingMore}
-			onloadmore={loadMore}
-		/>
+					{#if home.gapTotal === 0}
+						<p class="text-xs text-muted-foreground">Every season you're watching runs unbroken.</p>
+					{:else}
+						<!-- Reference, not a task list. No red, no count in a tile, and the
+						     copy says outright that some of these can't be fixed — a
+						     permanent to-do you can't complete just teaches you to stop
+						     reading the page. -->
+						<p class="mb-2 text-xs text-muted-foreground">
+							Holes in seasons that otherwise run clean.
+						</p>
+						<ul class="flex flex-col gap-1.5">
+							{#each home.gaps as gap (gap.id)}
+								<li class="text-xs">
+									<span class="truncate">{gap.showTitle}</span>
+									<span class="tabular text-muted-foreground">
+										S{String(gap.season).padStart(2, '0')} · {gap.episodes}
+									</span>
+								</li>
+							{/each}
+						</ul>
+						{#if home.gapTotal > home.gaps.length}
+							<p class="mt-2 text-xs text-muted-foreground">
+								+{home.gapTotal - home.gaps.length} more
+							</p>
+						{/if}
+						<p class="mt-2 text-[11px] text-muted-foreground">
+							Some were never going to be fixable — this is here so you know, not so you act.
+						</p>
+						<a
+							href="{resolve('/schedule')}?only=holes"
+							class="mt-2 inline-block text-xs text-muted-foreground underline-offset-4 hover:underline"
+						>
+							Schedule · gaps →
+						</a>
+					{/if}
+				</section>
+
+				{#if home.deadWeight && home.deadWeight.items > 0}
+					<section class="rounded-xl border bg-card/50 p-4 sm:p-5">
+						{#if sizesTrustworthy}
+							<div class="text-sm font-medium">
+								{bytes(home.deadWeight.bytes)} never played
+							</div>
+							<div class="tabular mt-0.5 text-xs text-muted-foreground">
+								{home.deadWeight.titles.toLocaleString()} titles · {home.deadWeight.items.toLocaleString()}
+								items
+							</div>
+						{:else}
+							<div class="tabular text-sm font-medium">
+								{home.deadWeight.titles.toLocaleString()} titles never played
+							</div>
+							<div class="tabular mt-0.5 text-xs text-muted-foreground">
+								{home.deadWeight.items.toLocaleString()} items · size unknown until a full sync
+							</div>
+						{/if}
+						<a
+							href={resolve('/unfinished')}
+							class="mt-2 inline-block text-xs text-muted-foreground underline-offset-4 hover:underline"
+						>
+							Unfinished →
+						</a>
+					</section>
+				{/if}
+			</aside>
+		</div>
+
+		<div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+			{#each tiles as tile (tile.label)}
+				<div class="rounded-xl border bg-card/50 p-4">
+					<div class="text-xs text-muted-foreground">{tile.label}</div>
+					<div class="tabular mt-1 text-2xl font-semibold tracking-tight">{tile.value}</div>
+					<div class="mt-0.5 truncate text-[11px] text-muted-foreground">{tile.hint}</div>
+				</div>
+			{/each}
+		</div>
+
+		<div class="mt-4 rounded-xl border p-4 sm:p-5">
+			<ActivityStrip days={home.activityDays} timeZone={data.timeZone} />
+		</div>
+
+		<p class="tabular mt-8 border-t pt-4 text-xs text-muted-foreground">
+			Synced {ago(home.sync.lastSyncedAt)} · {home.sync.plays.toLocaleString()} plays · {home.sync.items.toLocaleString()}
+			items · {home.sync.showsChecked.toLocaleString()} of {home.sync.showsIdentified.toLocaleString()}
+			shows checked
+			{#if home.sync.unowned.length > 0}
+				<br />
+				{home.sync.unowned.join(', ')} not checked — shared servers can't report other users
+			{/if}
+		</p>
 	{/if}
 </div>
