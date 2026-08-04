@@ -78,12 +78,19 @@
 	 * reads as an empty page unless it's called out, and the fix — a full re-sync
 	 * rather than the incremental one the Sync button runs — isn't guessable.
 	 */
-	const needsFullSync = $derived(
-		!neverSynced &&
-			data.overview.items > 0 &&
-			data.overview.rated === 0 &&
-			data.overview.sized === 0
+	/**
+	 * Details cover too little of the library to draw anything from.
+	 *
+	 * The old test was "none at all", which let a few dozen measured files
+	 * through and produced a quality-over-time chart with a single bar at the far
+	 * right and an empty axis behind it — an artefact of coverage, not a trend.
+	 * Percentiles, codec mix and the fit band are all equally meaningless on a
+	 * fraction of a percent.
+	 */
+	const detailCoverage = $derived(
+		data.overview.items > 0 ? data.overview.rated / data.overview.items : 0
 	);
+	const needsFullSync = $derived(!neverSynced && data.overview.items > 0 && detailCoverage < 0.9);
 
 	const latestMonth = $derived(
 		[...data.overview.months].reverse().find((month) => month.medianBitrate !== null) ?? null
@@ -147,9 +154,8 @@
 		<div class="rounded-xl border border-dashed p-10 text-center">
 			<h2 class="font-medium">Media details haven't been synced yet</h2>
 			<p class="mx-auto mt-2 max-w-md text-sm text-balance text-muted-foreground">
-				Bitrates, codecs and file sizes come from a full re-sync — the incremental one only fetches
-				what's new, so your {data.overview.items.toLocaleString()} existing items have no detail to read.
-				This walks every library again.
+				{data.overview.rated.toLocaleString()} of {data.overview.items.toLocaleString()} files have bitrates
+				on record. An incremental sync only fetches what's new — a full one walks every library again.
 			</p>
 			<Button class="mt-5" onclick={() => sync.run(true)} disabled={sync.syncing}>
 				{sync.syncing ? 'Syncing…' : 'Run a full sync'}
@@ -239,7 +245,7 @@
 			<WorklistTable
 				title="Too big for what it is"
 				description="Above the band, fattest first — the clearest space to win back"
-				caveat="Saving shown is the space above the top of the band, not a promise: the real figure depends on the source."
+				caveat="Saving is the space above the band, not a promise."
 				items={data.fit.worst}
 				{sectionLabels}
 				kind="reencode"
@@ -249,7 +255,7 @@
 			<WorklistTable
 				title="Too thin for the resolution"
 				description="Below the band, worst first — candidates for a better copy"
-				caveat="Low bitrate for the pixel count usually means a heavily compressed source. It can also mean a clean animation encode that genuinely needs less."
+				caveat="Animation can sit here legitimately — it needs less."
 				items={data.fit.best}
 				{sectionLabels}
 				kind="reencode"
@@ -259,7 +265,7 @@
 			<WorklistTable
 				title="Worth re-encoding"
 				description="H.264 files, biggest first"
-				caveat="An estimate: HEVC is assumed to be 40% smaller at similar quality, which real encodes hit anywhere from 25% to 60% of."
+				caveat="Assumes HEVC saves 40%; real encodes range 25–60%."
 				items={data.reencode}
 				{sectionLabels}
 				kind="reencode"
@@ -269,7 +275,7 @@
 			<WorklistTable
 				title="Duplicate files"
 				description="Items Plex holds more than one copy of"
-				caveat="An estimate: Plex reports one combined size per item, so this assumes the extra versions are about as big as the one you'd keep."
+				caveat="Plex reports one combined size, so extra versions are assumed similar."
 				items={data.duplicates}
 				{sectionLabels}
 				kind="duplicate"

@@ -4,7 +4,18 @@ import { servers } from '$lib/server/db/schema';
 import { getViewers } from '$lib/server/queries/users';
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load: LayoutServerLoad = async ({ locals, url }) => {
+	/*
+	 * `url` is read purely to declare the dependency.
+	 *
+	 * Scope is resolved in hooks and arrives on `locals`, so nothing here would
+	 * otherwise touch the URL — and a load that reads no URL property is never
+	 * re-run when only the query string changes. Selecting a different server or
+	 * user would update the address bar and nothing else.
+	 */
+	url.searchParams.get('server');
+	url.searchParams.get('user');
+
 	// The server list lives in the layout because the scope selector sits in the
 	// nav and applies to both Activity and Library — loading it per page would
 	// mean two copies that can disagree mid-navigation.
