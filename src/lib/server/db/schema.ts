@@ -74,6 +74,17 @@ export const servers = sqliteTable(
 		/** The server-local account id matching this Plex account, resolved from
 		 *  /accounts. Null until the first sync works it out. */
 		serverAccountId: integer('server_account_id'),
+		/**
+		 * Whose history the stored rows actually cover: 'self' or 'all'.
+		 *
+		 * The incremental watermark is a single newest-`viewedAt` per server, which
+		 * silently assumes every row it covers came from one stream. When the sync
+		 * widened to every user on an owned server that stopped being true: the
+		 * watermark sat at the owner's latest view, so a co-viewer's entire back
+		 * catalogue was below the line and never requested again. Recording the
+		 * scope lets a widening trigger one full re-walk instead of stranding it.
+		 */
+		historyScope: text('history_scope'),
 		lastSyncedAt: integer('last_synced_at'),
 		lastSyncError: text('last_sync_error'),
 		updatedAt: integer('updated_at').notNull()

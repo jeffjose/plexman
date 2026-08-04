@@ -253,13 +253,26 @@ async function syncServer(
 		 * later would mean a second full walk.
 		 */
 		const accountFilter = server.owned ? null : serverAccountId;
+		const desiredScope = accountFilter === null ? 'all' : 'self';
+
+		/*
+		 * A widening of scope has to re-walk from the beginning.
+		 *
+		 * The watermark can only speak for the rows it was built from, so once the
+		 * query starts covering more people than it used to, everything those
+		 * people watched before now sits below it. Comparing the stored scope
+		 * against the one we're about to use turns that into a single automatic
+		 * full walk rather than a gap nobody notices.
+		 */
+		const widened = server.historyScope !== desiredScope;
 
 		// Re-fetch the last hour on incremental runs. `viewedAt>` is exclusive and
 		// a view can land in the same second as the watermark, so an exact
 		// boundary can drop entries; the upsert makes the overlap free.
-		const watermark = full
-			? 0
-			: Math.max(0, (await newestViewedAt(server.clientIdentifier, account.id)) - 3600);
+		const watermark =
+			full || widened
+				? 0
+				: Math.max(0, (await newestViewedAt(server.clientIdentifier, account.id)) - 3600);
 		const syncedAt = Math.floor(Date.now() / 1000);
 
 		let start = 0;
@@ -342,6 +355,7 @@ async function syncServer(
 			.set({
 				baseUrl,
 				serverAccountId,
+				historyScope: desiredScope,
 				lastSyncedAt: syncedAt,
 				lastSyncError: null,
 				updatedAt: syncedAt
