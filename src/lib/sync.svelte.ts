@@ -1,5 +1,5 @@
 import { getContext, setContext } from 'svelte';
-import { invalidateAll } from '$app/navigation';
+import { refreshAll } from '$app/navigation';
 
 /**
  * Whether a sync of either kind is running in this tab.
@@ -86,7 +86,7 @@ export function createSync() {
 			}
 
 			message = parts.join(' ');
-			await invalidateAll();
+			await refreshAll();
 		} catch (error) {
 			message = `Sync failed: ${error instanceof Error ? error.message : String(error)}`;
 		} finally {
@@ -190,7 +190,7 @@ export function createActivityPoll() {
 			lastPolledAt = Date.now();
 			backoff = 0;
 
-			if (result.changed) await invalidateAll();
+			if (result.changed) await refreshAll();
 		} catch {
 			// Deliberately silent. A poll is not something the user asked for, so a
 			// failed one must not produce a message they have to dismiss — the manual

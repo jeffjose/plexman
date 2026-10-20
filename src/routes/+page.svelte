@@ -1,11 +1,11 @@
 <script lang="ts">
-	import Nav from '$lib/components/Nav.svelte';
-	import OnAir from '$lib/components/home/OnAir.svelte';
-	import NowPlaying from '$lib/components/home/NowPlaying.svelte';
-	import ActivityStrip from '$lib/components/home/ActivityStrip.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { formatBytes } from '$lib/components/quality/format';
-	import { createSync, getActivityPoll } from '$lib/sync.svelte';
+	import Nav from '#lib/components/Nav.svelte';
+	import OnAir from '#lib/components/home/OnAir.svelte';
+	import NowPlaying from '#lib/components/home/NowPlaying.svelte';
+	import ActivityStrip from '#lib/components/home/ActivityStrip.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { formatBytes } from '#lib/components/quality/format.js';
+	import { createSync, getActivityPoll } from '#lib/sync.svelte.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

@@ -15,7 +15,7 @@
 import { and, eq, gte, inArray, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { history, libraryItems, librarySections, servers, shows } from '../db/schema';
-import { addDays, dayKeyInZone, todayKey } from '$lib/activity/dates';
+import { addDays, dayKeyInZone, todayKey } from '#lib/activity/dates.js';
 import { getSchedule, type ScheduleEpisode } from './schedule';
 import { getActivitySummary, type DayBucket, type ViewerScope } from './activity';
 import { getFitReport } from './quality';

@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { getSchedule, isScheduleFilter } from '$lib/server/queries/schedule';
+import { getSchedule, isScheduleFilter } from '#lib/server/queries/schedule.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {

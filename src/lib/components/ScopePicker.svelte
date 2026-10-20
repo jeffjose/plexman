@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
 
 	/**
 	 * Server and viewer, as two adjacent dropdowns.
@@ -61,7 +61,7 @@
 	const people = $derived([...viewers].sort((a, b) => b.historyCount - a.historyCount));
 
 	function apply(params: Record<string, string | null>) {
-		const next = new URL(page.url);
+		const next = new URL(page.url.href);
 		for (const [key, value] of Object.entries(params)) {
 			if (value === null) next.searchParams.delete(key);
 			else next.searchParams.set(key, value);
@@ -70,7 +70,7 @@
 		// previous scope no longer refers to anything.
 		next.searchParams.delete('day');
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(next, { noScroll: true });
+		goto(next, { reset: false });
 	}
 </script>
 

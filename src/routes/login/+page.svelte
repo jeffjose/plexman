@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
-	import Logo from '$lib/components/Logo.svelte';
-	import Wordmark from '$lib/components/Wordmark.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import Logo from '#lib/components/Logo.svelte';
+	import Wordmark from '#lib/components/Wordmark.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -42,7 +42,7 @@
 			size="lg"
 			class="w-full bg-plex font-medium text-plex-foreground hover:bg-plex/90"
 			onclick={() => (signingIn = true)}
-			data-sveltekit-preload-data="off"
+			data-sveltekit-preload-data={false}
 		>
 			{signingIn ? 'Redirecting to Plex…' : 'Sign in with Plex'}
 		</Button>

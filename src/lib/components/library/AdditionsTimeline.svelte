@@ -5,11 +5,11 @@
 		formatTime,
 		relativeDay,
 		todayKey
-	} from '$lib/activity/dates';
-	import { TYPE_LABELS } from '$lib/activity/types';
-	import type { LibraryAddition } from '$lib/activity/library';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/activity/dates.js';
+	import { TYPE_LABELS } from '#lib/activity/types.js';
+	import type { LibraryAddition } from '#lib/activity/library.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 
 	interface Props {
 		items: LibraryAddition[];

@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import Nav from '$lib/components/Nav.svelte';
-	import EpisodeList from '$lib/components/schedule/EpisodeList.svelte';
-	import ShowRollup from '$lib/components/schedule/ShowRollup.svelte';
-	import StatusMark from '$lib/components/schedule/StatusMark.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Separator } from '$lib/components/ui/separator';
-	import { createSync } from '$lib/sync.svelte';
-	import type { ScheduleFilter } from '$lib/server/queries/schedule';
+	import Nav from '#lib/components/Nav.svelte';
+	import EpisodeList from '#lib/components/schedule/EpisodeList.svelte';
+	import ShowRollup from '#lib/components/schedule/ShowRollup.svelte';
+	import StatusMark from '#lib/components/schedule/StatusMark.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import { createSync } from '#lib/sync.svelte.js';
+	import type { ScheduleFilter } from '#lib/server/queries/schedule.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -23,11 +23,11 @@
 	];
 
 	function setParam(key: string, value: string | null) {
-		const next = new URL(page.url);
+		const next = new URL(page.url.href);
 		if (value === null) next.searchParams.delete(key);
 		else next.searchParams.set(key, value);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(next, { keepFocus: true, noScroll: true });
+		goto(next, { reset: false });
 	}
 
 	/**

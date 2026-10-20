@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatBitrate, formatBytes } from './format';
-	import type { QualityItem } from '$lib/server/queries/quality';
+	import type { QualityItem } from '#lib/server/queries/quality.js';
 
 	interface Props {
 		title: string;

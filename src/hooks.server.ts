@@ -1,7 +1,8 @@
-import type { Handle } from '@sveltejs/kit';
-import { startScheduler } from '$lib/server/sync/scheduler';
-import { resolveSession, SESSION_COOKIE } from '$lib/server/auth/session';
-import { TIMEZONE_COOKIE, isValidTimeZone } from '$lib/server/timezone';
+import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
+import { building } from '$app/env';
+import { startScheduler } from '#lib/server/sync/scheduler.js';
+import { resolveSession, SESSION_COOKIE } from '#lib/server/auth/session.js';
+import { TIMEZONE_COOKIE, isValidTimeZone } from '#lib/server/timezone.js';
 import {
 	ALL_SERVERS,
 	ALL_USERS,
@@ -9,15 +10,18 @@ import {
 	getUserScope,
 	setServerScope,
 	setUserScope
-} from '$lib/server/preferences';
+} from '#lib/server/preferences.js';
 
 /*
- * Started at module load, which is the only place a SvelteKit server has that
- * runs once and isn't tied to a request. Doing it inside `handle` would mean the
- * background sync never starts until someone visits — exactly the case it exists
- * to cover.
+ * Started from the `init` hook, which SvelteKit runs once per server process
+ * when it loads these hooks (at startup in production) rather than per request.
+ * Doing it inside `handle` would mean the background sync never starts until
+ * someone visits — exactly the case it exists to cover. Skipped while
+ * `vite build` loads the server, so a build never talks to Plex.
  */
-startScheduler();
+export const init: ServerInit = () => {
+	if (!building) startScheduler();
+};
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.account = await resolveSession(event.cookies.get(SESSION_COOKIE));

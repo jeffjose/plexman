@@ -1,6 +1,6 @@
-import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { getTimeline } from '$lib/server/queries/activity';
-import { parseActivityFilters } from '$lib/server/queries/params';
+import { error, type RequestHandler } from '@sveltejs/kit';
+import { getTimeline } from '#lib/server/queries/activity.js';
+import { parseActivityFilters } from '#lib/server/queries/params.js';
 
 /** Timeline pages, fetched as the user scrolls. */
 export const GET: RequestHandler = async ({ locals, url }) => {
@@ -17,5 +17,5 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		limit: Math.min(Number(url.searchParams.get('limit')) || 50, 200)
 	});
 
-	return json(page);
+	return Response.json(page);
 };

@@ -1,6 +1,6 @@
 import { redirect } from '@sveltejs/kit';
-import { getLibrarySummary, getLibraryTimeline, getSections } from '$lib/server/queries/library';
-import { parseCountMode, parseLibraryFilters } from '$lib/server/queries/params';
+import { getLibrarySummary, getLibraryTimeline, getSections } from '#lib/server/queries/library.js';
+import { parseCountMode, parseLibraryFilters } from '#lib/server/queries/params.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {

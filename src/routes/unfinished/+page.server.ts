@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { getUnfinished } from '$lib/server/queries/unfinished';
+import { getUnfinished } from '#lib/server/queries/unfinished.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {

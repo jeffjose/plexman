@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { TIER_LABELS, formatBitrate, formatBytes, formatShare, rampColor } from './format';
-	import type { QualityOverview, SectionQuality } from '$lib/server/queries/quality';
+	import type { QualityOverview, SectionQuality } from '#lib/server/queries/quality.js';
 
 	interface Props {
 		tiers: QualityOverview['tiers'];

@@ -42,7 +42,7 @@ export const TYPE_COLORS: Record<MediaType, string> = {
  * One row of the timeline.
  *
  * Lives here rather than beside the query that produces it so the components
- * can name the type without importing from `$lib/server`, which SvelteKit
+ * can name the type without importing from `#lib/server`, which SvelteKit
  * refuses to let client code touch.
  */
 export interface Viewer {

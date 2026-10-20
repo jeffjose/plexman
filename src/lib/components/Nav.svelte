@@ -4,7 +4,7 @@
 	import Logo from './Logo.svelte';
 	import ScopePicker from './ScopePicker.svelte';
 	import Wordmark from './Wordmark.svelte';
-	import { Button } from '$lib/components/ui/button';
+	import { Button } from '#lib/components/ui/button/index.js';
 
 	interface Props {
 		syncing: boolean;

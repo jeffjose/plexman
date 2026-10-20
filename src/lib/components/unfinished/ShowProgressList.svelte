@@ -6,7 +6,7 @@
 		formatDuration,
 		relativeDay,
 		todayKey
-	} from '$lib/activity/dates';
+	} from '#lib/activity/dates.js';
 	import type { PartWatchedShow } from './types';
 
 	interface Props {

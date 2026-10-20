@@ -1,9 +1,9 @@
-import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { getClientId } from '$lib/server/plex/auth';
-import { syncServers } from '$lib/server/sync/servers';
-import { syncHistory } from '$lib/server/sync/history';
-import { syncLibrary } from '$lib/server/sync/library';
-import { syncShows } from '$lib/server/sync/shows';
+import { error, type RequestHandler } from '@sveltejs/kit';
+import { getClientId } from '#lib/server/plex/auth.js';
+import { syncServers } from '#lib/server/sync/servers.js';
+import { syncHistory } from '#lib/server/sync/history.js';
+import { syncLibrary } from '#lib/server/sync/library.js';
+import { syncShows } from '#lib/server/sync/shows.js';
 
 /**
  * Pulls fresh watch history and library contents from every owned server.
@@ -59,5 +59,5 @@ export const POST: RequestHandler = async ({ locals, url }) => {
 		};
 	}
 
-	return json({ ...history, library, shows });
+	return Response.json({ ...history, library, shows });
 };

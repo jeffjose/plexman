@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatBytes } from './format';
-	import type { FitReport, FitVerdict } from '$lib/server/queries/quality';
+	import type { FitReport, FitVerdict } from '#lib/server/queries/quality.js';
 
 	let { fit }: { fit: FitReport } = $props();
 

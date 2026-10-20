@@ -10,6 +10,7 @@
 import { randomBytes } from 'node:crypto';
 import { eq, lt } from 'drizzle-orm';
 import type { Cookies } from '@sveltejs/kit';
+import { dev } from '$app/env';
 import { db } from '../db';
 import { accounts, sessions, type Account } from '../db/schema';
 
@@ -66,7 +67,7 @@ export function setSessionCookie(cookies: Cookies, sessionId: string): void {
 		sameSite: 'lax',
 		// Left off in dev so the cookie survives plain-HTTP localhost; the flow
 		// bounces through plex.tv and back, and a Secure cookie would be dropped.
-		secure: process.env.NODE_ENV === 'production',
+		secure: !dev,
 		maxAge: SESSION_TTL_SECONDS
 	});
 }

@@ -8,11 +8,11 @@
  */
 
 import { redirect, type RequestHandler } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { accounts } from '$lib/server/db/schema';
-import { getClientId, getUser, waitForPinToken, PIN_COOKIE } from '$lib/server/plex/auth';
-import { createSession, setSessionCookie } from '$lib/server/auth/session';
-import { syncServers } from '$lib/server/sync/servers';
+import { db } from '#lib/server/db/index.js';
+import { accounts } from '#lib/server/db/schema.js';
+import { getClientId, getUser, waitForPinToken, PIN_COOKIE } from '#lib/server/plex/auth.js';
+import { createSession, setSessionCookie } from '#lib/server/auth/session.js';
+import { syncServers } from '#lib/server/sync/servers.js';
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
 	const pinId = Number(cookies.get(PIN_COOKIE));

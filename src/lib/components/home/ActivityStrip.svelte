@@ -1,7 +1,13 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { addDays, todayKey, weekdayOf, WEEKDAY_LABELS, formatDayLong } from '$lib/activity/dates';
-	import { cellColor, type HeatmapDay } from '$lib/activity/heatmap';
+	import {
+		addDays,
+		todayKey,
+		weekdayOf,
+		WEEKDAY_LABELS,
+		formatDayLong
+	} from '#lib/activity/dates.js';
+	import { cellColor, type HeatmapDay } from '#lib/activity/heatmap.js';
 
 	interface Props {
 		days: HeatmapDay[];

@@ -1,7 +1,7 @@
 /**
  * Shapes shared by the unfinished view and its components.
  *
- * They live outside `$lib/server` for the same reason `$lib/activity/library.ts`
+ * They live outside `#lib/server` for the same reason `#lib/activity/library.ts`
  * does: the components have to name these types, and SvelteKit won't let client
  * code import from a server module.
  */

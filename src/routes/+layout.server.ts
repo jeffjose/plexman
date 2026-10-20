@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { servers } from '$lib/server/db/schema';
-import { getViewers } from '$lib/server/queries/users';
+import { db } from '#lib/server/db/index.js';
+import { servers } from '#lib/server/db/schema.js';
+import { getViewers } from '#lib/server/queries/users.js';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async ({ locals, url }) => {

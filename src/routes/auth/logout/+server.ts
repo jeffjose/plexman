@@ -1,5 +1,5 @@
 import { redirect, type RequestHandler } from '@sveltejs/kit';
-import { clearSessionCookie, destroySession, SESSION_COOKIE } from '$lib/server/auth/session';
+import { clearSessionCookie, destroySession, SESSION_COOKIE } from '#lib/server/auth/session.js';
 
 /**
  * Ends the local session only. The Plex auth token stays valid — revoking it is

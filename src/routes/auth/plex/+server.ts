@@ -7,7 +7,8 @@
  */
 
 import { redirect, type RequestHandler } from '@sveltejs/kit';
-import { buildAuthUrl, createPin, getClientId, PIN_COOKIE } from '$lib/server/plex/auth';
+import { buildAuthUrl, createPin, getClientId, PIN_COOKIE } from '#lib/server/plex/auth.js';
+import { PLEX_AUTH_APP } from '#lib/server/plex/constants.js';
 
 export const GET: RequestHandler = async ({ cookies, url }) => {
 	const clientId = await getClientId();
@@ -24,5 +25,7 @@ export const GET: RequestHandler = async ({ cookies, url }) => {
 	});
 
 	const forwardUrl = new URL('/auth/plex/callback', url.origin).toString();
-	redirect(303, buildAuthUrl({ clientId, code: pin.code, forwardUrl }));
+	redirect(303, buildAuthUrl({ clientId, code: pin.code, forwardUrl }), {
+		external: [new URL(PLEX_AUTH_APP).origin]
+	});
 };

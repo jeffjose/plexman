@@ -1,6 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
-import type { Account } from '$lib/server/db/schema';
+import type { Account } from '#lib/server/db/schema.js';
 
 declare global {
 	namespace App {

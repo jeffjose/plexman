@@ -1,12 +1,12 @@
 import { redirect } from '@sveltejs/kit';
-import { getSections } from '$lib/server/queries/library';
+import { getSections } from '#lib/server/queries/library.js';
 import {
 	getDuplicates,
 	getFitReport,
 	getQualityOverview,
 	getReencodeWorklist,
 	parseQualityFilters
-} from '$lib/server/queries/quality';
+} from '#lib/server/queries/quality.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {

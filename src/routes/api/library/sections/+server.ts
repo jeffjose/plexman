@@ -1,5 +1,5 @@
-import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { setSectionHidden } from '$lib/server/queries/library';
+import { error, type RequestHandler } from '@sveltejs/kit';
+import { setSectionHidden } from '#lib/server/queries/library.js';
 
 /**
  * Mutes or unmutes a library.
@@ -23,5 +23,5 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	const ok = await setSectionHidden(locals.account.id, body.serverId, body.sectionKey, body.hidden);
 	if (!ok) error(404, 'Unknown library');
 
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

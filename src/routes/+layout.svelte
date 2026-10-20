@@ -1,8 +1,8 @@
 <script lang="ts">
 	import '../app.css';
-	import { invalidateAll } from '$app/navigation';
-	import { browser } from '$app/environment';
-	import { createActivityPoll, setActivityPoll } from '$lib/sync.svelte';
+	import { refreshAll } from '$app/navigation';
+	import { browser } from '$app/env';
+	import { createActivityPoll, setActivityPoll } from '#lib/sync.svelte.js';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
@@ -42,7 +42,7 @@
 		if (!zone || zone === data.timeZone) return;
 
 		document.cookie = `plexman_tz=${encodeURIComponent(zone)}; path=/; max-age=31536000; samesite=lax`;
-		invalidateAll();
+		refreshAll();
 	});
 </script>
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatBytes, formatShare, rampColor } from './format';
-	import type { MixEntry } from '$lib/server/queries/quality';
+	import type { MixEntry } from '#lib/server/queries/quality.js';
 
 	interface Props {
 		resolutions: MixEntry[];

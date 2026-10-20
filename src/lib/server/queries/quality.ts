@@ -16,7 +16,7 @@
 import { and, desc, inArray, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { libraryItems, librarySections, servers } from '../db/schema';
-import { dayKeyInZone } from '$lib/activity/dates';
+import { dayKeyInZone } from '#lib/activity/dates.js';
 
 export interface QualityFilters {
 	/** Restrict to particular servers; empty/absent means all of them. */
@@ -79,7 +79,7 @@ export function parseQualityFilters(params: URLSearchParams, serverIds: string[]
 export type TierKey = 'top' | 'high' | 'mid' | 'low' | 'bottom';
 
 /** Best first. The labels these are rendered with live in the components' own
- *  `format.ts` — a client bundle can't import from `$lib/server`. */
+ *  `format.ts` — a client bundle can't import from `#lib/server`. */
 export const TIER_KEYS: TierKey[] = ['top', 'high', 'mid', 'low', 'bottom'];
 
 function tierFor(percentile: number): TierKey {

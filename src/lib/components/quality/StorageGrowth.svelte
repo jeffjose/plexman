@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { formatBytes, formatMonth, sectionColor } from './format';
-	import type { QualityMonth, SectionQuality } from '$lib/server/queries/quality';
+	import type { QualityMonth, SectionQuality } from '#lib/server/queries/quality.js';
 
 	interface Props {
 		months: QualityMonth[];

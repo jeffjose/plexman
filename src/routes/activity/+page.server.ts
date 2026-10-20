@@ -1,9 +1,9 @@
 import { redirect } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { servers } from '$lib/server/db/schema';
-import { getActivitySummary, getTimeline } from '$lib/server/queries/activity';
-import { parseActivityFilters } from '$lib/server/queries/params';
+import { db } from '#lib/server/db/index.js';
+import { servers } from '#lib/server/db/schema.js';
+import { getActivitySummary, getTimeline } from '#lib/server/queries/activity.js';
+import { parseActivityFilters } from '#lib/server/queries/params.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {

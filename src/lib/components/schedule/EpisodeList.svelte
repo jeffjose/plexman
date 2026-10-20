@@ -1,7 +1,7 @@
 <script lang="ts">
 	import StatusMark from './StatusMark.svelte';
-	import { formatDayLong, relativeDay, todayKey } from '$lib/activity/dates';
-	import type { ScheduleEpisode } from '$lib/server/queries/schedule';
+	import { formatDayLong, relativeDay, todayKey } from '#lib/activity/dates.js';
+	import type { ScheduleEpisode } from '#lib/server/queries/schedule.js';
 
 	interface Props {
 		episodes: ScheduleEpisode[];

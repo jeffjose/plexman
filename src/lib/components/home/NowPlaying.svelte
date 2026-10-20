@@ -1,6 +1,6 @@
 <script lang="ts">
-	import ViewerBadge from '$lib/components/activity/ViewerBadge.svelte';
-	import type { LiveSession } from '$lib/sync.svelte';
+	import ViewerBadge from '#lib/components/activity/ViewerBadge.svelte';
+	import type { LiveSession } from '#lib/sync.svelte.js';
 
 	interface Props {
 		sessions: LiveSession[];

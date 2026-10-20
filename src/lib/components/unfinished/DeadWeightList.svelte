@@ -5,8 +5,8 @@
 		formatDuration,
 		relativeDay,
 		todayKey
-	} from '$lib/activity/dates';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/activity/dates.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import type { DeadWeight, DeadWeightItem } from './types';
 
 	interface Props {

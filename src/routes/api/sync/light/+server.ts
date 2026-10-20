@@ -1,6 +1,6 @@
-import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { getClientId } from '$lib/server/plex/auth';
-import { lightSync } from '$lib/server/sync/light';
+import { error, type RequestHandler } from '@sveltejs/kit';
+import { getClientId } from '#lib/server/plex/auth.js';
+import { lightSync } from '#lib/server/sync/light.js';
 
 /**
  * The polled sync: live sessions, new history, and any library whose change
@@ -14,5 +14,5 @@ export const POST: RequestHandler = async ({ locals }) => {
 	if (!locals.account) error(401, 'Not signed in');
 
 	const clientId = await getClientId();
-	return json(await lightSync(locals.account, clientId));
+	return Response.json(await lightSync(locals.account, clientId));
 };

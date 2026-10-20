@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { getHomeData } from '$lib/server/queries/home';
+import { getHomeData } from '#lib/server/queries/home.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals, url }) => {

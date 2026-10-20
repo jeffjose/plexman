@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { CODEC_GROUPS, CODEC_LABELS, formatBitrate, formatMonth } from './format';
-	import type { QualityMonth } from '$lib/server/queries/quality';
+	import type { QualityMonth } from '#lib/server/queries/quality.js';
 
 	interface Props {
 		months: QualityMonth[];

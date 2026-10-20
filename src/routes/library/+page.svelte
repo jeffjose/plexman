@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Heatmap from '$lib/components/activity/Heatmap.svelte';
-	import AdditionsTimeline from '$lib/components/library/AdditionsTimeline.svelte';
-	import Nav from '$lib/components/Nav.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Separator } from '$lib/components/ui/separator';
-	import { COUNT_MODES, COUNT_MODE_LABELS, type LibraryAddition } from '$lib/activity/library';
-	import { formatDayLong } from '$lib/activity/dates';
-	import { createSync } from '$lib/sync.svelte';
+	import Heatmap from '#lib/components/activity/Heatmap.svelte';
+	import AdditionsTimeline from '#lib/components/library/AdditionsTimeline.svelte';
+	import Nav from '#lib/components/Nav.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import { COUNT_MODES, COUNT_MODE_LABELS, type LibraryAddition } from '#lib/activity/library.js';
+	import { formatDayLong } from '#lib/activity/dates.js';
+	import { createSync } from '#lib/sync.svelte.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -47,10 +47,10 @@
 	});
 
 	function updateUrl(mutate: (params: URLSearchParams) => void) {
-		const next = new URL(page.url);
+		const next = new URL(page.url.href);
 		mutate(next.searchParams);
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(next, { keepFocus: true, noScroll: true });
+		goto(next, { reset: false });
 	}
 
 	/**
@@ -82,7 +82,7 @@
 				})
 			});
 			if (!response.ok) throw new Error(await response.text());
-			await invalidateAll();
+			await refreshAll();
 		} catch (error) {
 			console.error(error);
 		} finally {
@@ -134,7 +134,7 @@
 		loadingMore = true;
 
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const request = new URL(page.url);
+		const request = new URL(page.url.href);
 		request.pathname = '/api/library';
 		request.searchParams.set('cursor', cursor);
 

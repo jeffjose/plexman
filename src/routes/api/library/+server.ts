@@ -1,6 +1,6 @@
-import { error, json, type RequestHandler } from '@sveltejs/kit';
-import { getLibraryTimeline } from '$lib/server/queries/library';
-import { parseCountMode, parseLibraryFilters } from '$lib/server/queries/params';
+import { error, type RequestHandler } from '@sveltejs/kit';
+import { getLibraryTimeline } from '#lib/server/queries/library.js';
+import { parseCountMode, parseLibraryFilters } from '#lib/server/queries/params.js';
 
 /** Additions-timeline pages, fetched as the user scrolls. */
 export const GET: RequestHandler = async ({ locals, url }) => {
@@ -17,5 +17,5 @@ export const GET: RequestHandler = async ({ locals, url }) => {
 		}
 	);
 
-	return json(page);
+	return Response.json(page);
 };

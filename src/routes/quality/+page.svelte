@@ -2,16 +2,16 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Nav from '$lib/components/Nav.svelte';
-	import MediaMix from '$lib/components/quality/MediaMix.svelte';
-	import FitBand from '$lib/components/quality/FitBand.svelte';
-	import QualityTiers from '$lib/components/quality/QualityTiers.svelte';
-	import QualityTrend from '$lib/components/quality/QualityTrend.svelte';
-	import StorageGrowth from '$lib/components/quality/StorageGrowth.svelte';
-	import WorklistTable from '$lib/components/quality/WorklistTable.svelte';
-	import { formatBitrate, formatBytes, formatMonth } from '$lib/components/quality/format';
-	import { Button } from '$lib/components/ui/button';
-	import { createSync } from '$lib/sync.svelte';
+	import Nav from '#lib/components/Nav.svelte';
+	import MediaMix from '#lib/components/quality/MediaMix.svelte';
+	import FitBand from '#lib/components/quality/FitBand.svelte';
+	import QualityTiers from '#lib/components/quality/QualityTiers.svelte';
+	import QualityTrend from '#lib/components/quality/QualityTrend.svelte';
+	import StorageGrowth from '#lib/components/quality/StorageGrowth.svelte';
+	import WorklistTable from '#lib/components/quality/WorklistTable.svelte';
+	import { formatBitrate, formatBytes, formatMonth } from '#lib/components/quality/format.js';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { createSync } from '#lib/sync.svelte.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -54,7 +54,7 @@
 	);
 
 	function toggleSection(id: string) {
-		const next = new URL(page.url);
+		const next = new URL(page.url.href);
 		const selected = selectedSections.includes(id)
 			? selectedSections.filter((value) => value !== id)
 			: [...selectedSections, id];
@@ -67,7 +67,7 @@
 		}
 
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(next, { keepFocus: true, noScroll: true });
+		goto(next, { reset: false });
 	}
 
 	const neverSynced = $derived(data.sections.length === 0);

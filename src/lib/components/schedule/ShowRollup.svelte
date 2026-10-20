@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { ScheduleShow } from '$lib/server/queries/schedule';
+	import type { ScheduleShow } from '#lib/server/queries/schedule.js';
 
 	interface Props {
 		shows: ScheduleShow[];

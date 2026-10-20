@@ -9,7 +9,7 @@ SQLite file. Nothing leaves your machine.
 
 ## Stack
 
-SvelteKit 2 · Svelte 5 (runes) · Tailwind v4 · shadcn-svelte · Drizzle + libSQL
+SvelteKit 3 · Svelte 5 (runes) · Tailwind v4 · shadcn-svelte · Drizzle + libSQL
 
 ## Running it
 

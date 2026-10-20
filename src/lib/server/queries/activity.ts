@@ -12,9 +12,9 @@
 import { and, eq, gte, lte, inArray, desc, sql, like, or, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { history, serverAccounts, servers } from '../db/schema';
-import { dayKeyInZone } from '$lib/activity/dates';
-import type { MediaType, TimelineItem } from '$lib/activity/types';
-import { normalizeType } from '$lib/activity/types';
+import { dayKeyInZone } from '#lib/activity/dates.js';
+import type { MediaType, TimelineItem } from '#lib/activity/types.js';
+import { normalizeType } from '#lib/activity/types.js';
 
 /**
  * Whose history to include.

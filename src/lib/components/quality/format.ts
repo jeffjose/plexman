@@ -6,7 +6,7 @@
  * panel and "1,438 GB" in the next would read as two different numbers.
  *
  * The tier and codec labels live here too, rather than beside the query that
- * produces the keys: `$lib/server` can't be imported into a client bundle, and
+ * produces the keys: `#lib/server` can't be imported into a client bundle, and
  * a label is a presentation decision anyway.
  */
 

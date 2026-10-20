@@ -8,9 +8,9 @@
 
 import type { ActivityFilters } from './activity';
 import type { LibraryFilters } from './library';
-import { isMediaType, type MediaType } from '$lib/activity/types';
-import { isCountMode, type CountMode } from '$lib/activity/library';
-import { dayBounds } from '$lib/activity/dates';
+import { isMediaType, type MediaType } from '#lib/activity/types.js';
+import { isCountMode, type CountMode } from '#lib/activity/library.js';
+import { dayBounds } from '#lib/activity/dates.js';
 
 const DAY_KEY = /^\d{4}-\d{2}-\d{2}$/;
 

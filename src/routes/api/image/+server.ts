@@ -13,10 +13,10 @@
 
 import { error, type RequestHandler } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { servers } from '$lib/server/db/schema';
-import { plexHeaders } from '$lib/server/plex/client';
-import { getClientId } from '$lib/server/plex/auth';
+import { db } from '#lib/server/db/index.js';
+import { servers } from '#lib/server/db/schema.js';
+import { plexHeaders } from '#lib/server/plex/client.js';
+import { getClientId } from '#lib/server/plex/auth.js';
 
 export const GET: RequestHandler = async ({ locals, url, fetch }) => {
 	if (!locals.account) error(401, 'Not signed in');

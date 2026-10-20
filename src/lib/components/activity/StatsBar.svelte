@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { formatDayLong } from '$lib/activity/dates';
-	import { TYPE_LABELS, type MediaType } from '$lib/activity/types';
+	import { formatDayLong } from '#lib/activity/dates.js';
+	import { TYPE_LABELS, type MediaType } from '#lib/activity/types.js';
 
 	interface Props {
 		total: number;

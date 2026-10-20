@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { viewerColors, viewerInitials } from '$lib/activity/viewers';
-	import type { Viewer } from '$lib/activity/types';
+	import { viewerColors, viewerInitials } from '#lib/activity/viewers.js';
+	import type { Viewer } from '#lib/activity/types.js';
 
 	interface Props {
 		viewer: Viewer | null;

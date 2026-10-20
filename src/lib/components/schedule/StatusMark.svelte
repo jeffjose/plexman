@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { EpisodeStatus, GapKind } from '$lib/server/queries/schedule';
+	import type { EpisodeStatus, GapKind } from '#lib/server/queries/schedule.js';
 
 	/**
 	 * The per-episode state marker.

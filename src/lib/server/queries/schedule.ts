@@ -17,7 +17,7 @@
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { canonicalEpisodes, libraryItems, librarySections, servers, shows } from '../db/schema';
-import { daysBetween, todayKey } from '$lib/activity/dates';
+import { daysBetween, todayKey } from '#lib/activity/dates.js';
 
 /** Canonical rows read per request. Comfortably above a complete library's
  *  episode count; the cap exists so a runaway table can't stall a page load. */

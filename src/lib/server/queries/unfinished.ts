@@ -19,14 +19,14 @@
 import { and, eq, inArray, isNotNull, sql, type SQL } from 'drizzle-orm';
 import { db } from '../db';
 import { history, libraryItems, librarySections, servers } from '../db/schema';
-import { dayKeyInZone, daysBetween, todayKey } from '$lib/activity/dates';
+import { dayKeyInZone, daysBetween, todayKey } from '#lib/activity/dates.js';
 import type {
 	DeadWeightItem,
 	DeadWeightKind,
 	NextEpisode,
 	PartWatchedShow,
 	UnfinishedSummary
-} from '$lib/components/unfinished/types';
+} from '#lib/components/unfinished/types.js';
 
 /**
  * Idle days after which a part-watched show stops counting as "in progress".

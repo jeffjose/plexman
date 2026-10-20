@@ -6,10 +6,10 @@
 		formatDuration,
 		relativeDay,
 		todayKey
-	} from '$lib/activity/dates';
-	import { TYPE_LABELS, type TimelineItem } from '$lib/activity/types';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Button } from '$lib/components/ui/button';
+	} from '#lib/activity/dates.js';
+	import { TYPE_LABELS, type TimelineItem } from '#lib/activity/types.js';
+	import { Skeleton } from '#lib/components/ui/skeleton/index.js';
+	import { Button } from '#lib/components/ui/button/index.js';
 	import ViewerBadge from './ViewerBadge.svelte';
 
 	interface Props {

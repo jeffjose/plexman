@@ -1,9 +1,9 @@
 <script lang="ts">
-	import Nav from '$lib/components/Nav.svelte';
-	import DeadWeightList from '$lib/components/unfinished/DeadWeightList.svelte';
-	import ShowProgressList from '$lib/components/unfinished/ShowProgressList.svelte';
-	import * as Tabs from '$lib/components/ui/tabs';
-	import { createSync } from '$lib/sync.svelte';
+	import Nav from '#lib/components/Nav.svelte';
+	import DeadWeightList from '#lib/components/unfinished/DeadWeightList.svelte';
+	import ShowProgressList from '#lib/components/unfinished/ShowProgressList.svelte';
+	import * as Tabs from '#lib/components/ui/tabs/index.js';
+	import { createSync } from '#lib/sync.svelte.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

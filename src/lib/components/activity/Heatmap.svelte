@@ -4,9 +4,9 @@
 		cellColor,
 		type HeatmapCell,
 		type HeatmapDay
-	} from '$lib/activity/heatmap';
-	import { addDays, formatDayLong, todayKey, WEEKDAY_LABELS } from '$lib/activity/dates';
-	import { TYPE_LABELS, type MediaType } from '$lib/activity/types';
+	} from '#lib/activity/heatmap.js';
+	import { addDays, formatDayLong, todayKey, WEEKDAY_LABELS } from '#lib/activity/dates.js';
+	import { TYPE_LABELS, type MediaType } from '#lib/activity/types.js';
 
 	interface Props {
 		days: HeatmapDay[];

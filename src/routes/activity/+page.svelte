@@ -2,15 +2,20 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Heatmap from '$lib/components/activity/Heatmap.svelte';
-	import Timeline from '$lib/components/activity/Timeline.svelte';
-	import StatsBar from '$lib/components/activity/StatsBar.svelte';
-	import Nav from '$lib/components/Nav.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Separator } from '$lib/components/ui/separator';
-	import { MEDIA_TYPES, TYPE_LABELS, type MediaType, type TimelineItem } from '$lib/activity/types';
-	import { formatDayLong } from '$lib/activity/dates';
-	import { createSync } from '$lib/sync.svelte';
+	import Heatmap from '#lib/components/activity/Heatmap.svelte';
+	import Timeline from '#lib/components/activity/Timeline.svelte';
+	import StatsBar from '#lib/components/activity/StatsBar.svelte';
+	import Nav from '#lib/components/Nav.svelte';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Separator } from '#lib/components/ui/separator/index.js';
+	import {
+		MEDIA_TYPES,
+		TYPE_LABELS,
+		type MediaType,
+		type TimelineItem
+	} from '#lib/activity/types.js';
+	import { formatDayLong } from '#lib/activity/dates.js';
+	import { createSync } from '#lib/sync.svelte.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -31,13 +36,13 @@
 	const hasFilters = $derived(activeTypes.length > 0 || Boolean(selectedDay) || Boolean(search));
 
 	function updateUrl(mutate: (params: URLSearchParams) => void) {
-		const next = new URL(page.url);
+		const next = new URL(page.url.href);
 		mutate(next.searchParams);
 		// Navigating to the page we're already on with different query params.
 		// `resolve()` exists to turn a route id into a path, which this isn't —
 		// the rule just can't tell a same-route URL object from an external one.
 		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		goto(next, { keepFocus: true, noScroll: true });
+		goto(next, { reset: false });
 	}
 
 	function toggleType(type: MediaType) {
@@ -105,7 +110,7 @@
 		// two can't disagree about what's being listed. Plain URL, not SvelteURL:
 		// it's built, fetched once and dropped, and nothing tracks it.
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const request = new URL(page.url);
+		const request = new URL(page.url.href);
 		request.pathname = '/api/timeline';
 		request.searchParams.set('cursor', cursor);
 
