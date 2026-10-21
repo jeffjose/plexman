@@ -128,6 +128,17 @@
 	const neverSynced = $derived(
 		data.servers.length > 0 && data.servers.every((s) => !s.lastSyncedAt)
 	);
+
+	/**
+	 * Only label rows when the list can actually hold more than one person.
+	 *
+	 * Scoped to a single viewer, every badge would carry the same name — a column
+	 * of identical marks that costs width and answers a question nobody asked.
+	 * `all` with one known viewer is the same situation by another route.
+	 */
+	const showViewers = $derived(
+		data.userScope === 'all' && data.viewers.filter((viewer) => viewer.historyCount > 0).length > 1
+	);
 </script>
 
 <div class="mx-auto min-h-svh w-full max-w-5xl px-4 pb-24 sm:px-6">
@@ -255,6 +266,7 @@
 			timeZone={data.timeZone}
 			hasMore={cursor !== null}
 			loading={loadingMore}
+			{showViewers}
 			onloadmore={loadMore}
 		/>
 	{/if}

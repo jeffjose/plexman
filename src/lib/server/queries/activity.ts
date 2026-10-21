@@ -11,7 +11,7 @@
 
 import { and, eq, gte, lte, inArray, desc, sql, like, or, type SQL } from 'drizzle-orm';
 import { db } from '../db';
-import { history, servers } from '../db/schema';
+import { history, serverAccounts, servers } from '../db/schema';
 import { dayKeyInZone } from '$lib/activity/dates';
 import type { MediaType, TimelineItem } from '$lib/activity/types';
 import { normalizeType } from '$lib/activity/types';
@@ -252,9 +252,22 @@ export async function getTimeline(
 			)
 		: base;
 
+	/*
+	 * Left join, not inner: a history row whose `serverAccountId` is null — an
+	 * older sync, or a server that didn't report one — must still appear. Losing
+	 * plays from the timeline because nobody can be credited for them would be a
+	 * far worse bug than showing them unattributed.
+	 */
 	const rows = await db
-		.select()
+		.select({ row: history, viewerName: serverAccounts.name })
 		.from(history)
+		.leftJoin(
+			serverAccounts,
+			and(
+				eq(serverAccounts.serverId, history.serverId),
+				eq(serverAccounts.accountId, history.serverAccountId)
+			)
+		)
 		.where(where)
 		.orderBy(desc(history.viewedAt), desc(history.historyKey))
 		.limit(limit + 1);
@@ -262,13 +275,23 @@ export async function getTimeline(
 	const hasMore = rows.length > limit;
 	const page = hasMore ? rows.slice(0, limit) : rows;
 
-	const items: TimelineItem[] = page.map((row) => {
+	const items: TimelineItem[] = page.map(({ row, viewerName }) => {
 		const type = normalizeType(row.type);
 		const isEpisode = type === 'episode';
 
 		return {
 			serverId: row.serverId,
 			historyKey: row.historyKey,
+			viewer:
+				row.serverAccountId != null
+					? {
+							id: `${row.serverId}:${row.serverAccountId}`,
+							// A server that knows the id but not the name still identifies a
+							// distinct person, and the badge colour keys off the id, so the
+							// row stays useful with a placeholder label.
+							name: viewerName || `Account ${row.serverAccountId}`
+						}
+					: null,
 			type,
 			rawType: row.type,
 			// For episodes the show is the headline and the episode name the
@@ -286,7 +309,7 @@ export async function getTimeline(
 		};
 	});
 
-	const last = page.at(-1);
+	const last = page.at(-1)?.row;
 	return {
 		items,
 		nextCursor: hasMore && last ? encodeCursor(last.viewedAt, last.historyKey) : null

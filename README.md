@@ -57,6 +57,46 @@ walks everything, which on a long-lived server can take a minute.
 everything, which is what you want after Plex itself rewrites history (a library
 move, a bulk mark-unwatched).
 
+### Staying current
+
+The full sync is not slow because a delta is expensive — measured against a real
+server the incremental library pages come back in 8–39ms and are usually empty.
+It's slow because it pays a fixed toll every run regardless: a plex.tv resources
+call (~400ms), a roster fetch, a correlated UPDATE rebuilding per-user counts,
+and up to 50 plex.tv show-metadata lookups (~10–25s). That's maintenance, and
+maintenance doesn't belong on a timer.
+
+So `POST /api/sync/light` (`src/lib/server/sync/light.ts`) does only what has to
+happen often, and leans on signals Plex already gives us:
+
+- **`/library/sections` reports `contentChangedAt`** — a counter, not a
+  timestamp, that the server bumps on any add, edit or delete in a section.
+  Stored per section, so the usual case is one request for the whole server that
+  decides to walk nothing.
+- **`/status/sessions` (15ms)** is the only view of a play *while it happens*;
+  history isn't written until Plex scrobbles, around 90% through.
+- History asks the same filtered question the full sync does, which is one
+  request returning zero rows on a quiet server.
+
+Steady state is ~400ms and reports `changed: false`, which is what stops the
+browser re-running every query on the page. "Changed" is a row-count delta, not
+the upsert's own tally: the one-hour overlap window re-touches recent rows on
+every run, so trusting that tally would report a change forever.
+
+It deliberately never does a *first* walk — a server or section with no prior
+sync is reported as pending and left to the full sync, so opening the app can't
+silently start a 52,000-item crawl from a background timer.
+
+Two things drive it: the browser polls every 90s while the tab is visible
+(`createActivityPoll` in `src/lib/sync.svelte.ts`), and the server itself every
+10 minutes so nothing is lost when no browser is open at all
+(`src/lib/server/sync/scheduler.ts`). They share an in-flight guard, since they
+will overlap.
+
+Plex also has a push channel — a WebSocket at `/:/websockets/notifications`, no
+Plex Pass needed — that would replace the polling entirely and report deletions
+as they happen. Not built yet.
+
 Two things the sync has to defend against, both found against real servers:
 
 - **Impossible timestamps.** Plex stores the timestamp the _playing client_
@@ -92,4 +132,6 @@ no business being in the DOM.
   groundwork for feeding "what I've actually watched" into recommendations.
 - Watch _time_ totals. History rows frequently omit `duration`, so summing them
   would silently undercount; that needs a metadata enrichment pass first.
-- Multi-user servers: history for other users is stored but never shown.
+- Reconciling deletions without a full walk. `?X-Plex-Container-Size=0` returns
+  a section's `totalSize` in ~23ms, so a count mismatch would be a cheap trigger
+  for re-walking just that section.

@@ -15,6 +15,7 @@ import {
 	getServerAccounts,
 	matchServerAccount,
 	resolveBaseUrl,
+	targetFor,
 	type ServerTarget
 } from '../plex/server';
 import { HISTORY_PAGE_SIZE } from '../plex/constants';
@@ -178,8 +179,9 @@ async function recordServerAccounts(
 }
 
 /** Refreshes each user's row count so the picker can hide accounts that exist
- *  but have never watched anything. */
-async function refreshHistoryCounts(serverId: string): Promise<void> {
+ *  but have never watched anything. Correlated over the whole history table, so
+ *  the light sync runs it only when it actually inserted something. */
+export async function refreshHistoryCounts(serverId: string): Promise<void> {
 	await db.run(sql`
 		UPDATE ${serverAccounts}
 		SET ${sql.raw('history_count')} = COALESCE((
@@ -191,7 +193,7 @@ async function refreshHistoryCounts(serverId: string): Promise<void> {
 	`);
 }
 
-async function newestViewedAt(serverId: string, accountId: number): Promise<number> {
+export async function newestViewedAt(serverId: string, accountId: number): Promise<number> {
 	const [row] = await db
 		.select({ viewedAt: history.viewedAt })
 		.from(history)
@@ -199,6 +201,115 @@ async function newestViewedAt(serverId: string, accountId: number): Promise<numb
 		.orderBy(desc(history.viewedAt))
 		.limit(1);
 	return row?.viewedAt ?? 0;
+}
+
+export interface HistoryWalk {
+	inserted: number;
+	scanned: number;
+	skipped: number;
+}
+
+/**
+ * Pages forward from a watermark, writing every plausible entry.
+ *
+ * The whole of what a history sync *has* to do — the roster fetch, the user
+ * counts and the implausible-timestamp purge around it are maintenance that a
+ * frequent poll shouldn't pay for on every run. Split out so the light sync can
+ * take this and leave the rest.
+ */
+export async function walkHistory(
+	baseUrl: string,
+	target: ServerTarget,
+	serverId: string,
+	accountId: number,
+	options: {
+		accountFilter: number | null;
+		watermark: number;
+		syncedAt: number;
+		/** Ceiling on rows this walk will pull. The watermark keeps a normal run
+		 *  tiny; this bounds the abnormal one, where Plex has rewritten history
+		 *  under us and a background poll would otherwise turn into a full walk. */
+		maxRows?: number;
+	}
+): Promise<HistoryWalk> {
+	const walk: HistoryWalk = { inserted: 0, scanned: 0, skipped: 0 };
+	const { accountFilter, watermark, syncedAt, maxRows = MAX_ROWS_PER_SYNC } = options;
+
+	let start = 0;
+	let total = Infinity;
+
+	while (start < total && walk.scanned < maxRows) {
+		const page = await fetchHistoryPage(baseUrl, target, {
+			serverAccountId: accountFilter,
+			viewedAfter: watermark > 0 ? watermark : undefined,
+			start,
+			size: HISTORY_PAGE_SIZE
+		});
+
+		total = page.totalSize;
+		walk.scanned += page.entries.length;
+
+		const rows: NewHistoryRow[] = [];
+		for (const entry of page.entries) {
+			const row = toRow(entry, serverId, accountId, syncedAt);
+			if (!row) continue;
+			if (!isPlausibleViewedAt(row.viewedAt, syncedAt)) {
+				walk.skipped++;
+				continue;
+			}
+			rows.push(row);
+		}
+
+		if (rows.length > 0) {
+			// Chunked because SQLite caps variables per statement and each row
+			// carries ~20 of them.
+			for (let offset = 0; offset < rows.length; offset += 200) {
+				const chunk = rows.slice(offset, offset + 200);
+				const written = await db
+					.insert(history)
+					.values(chunk)
+					.onConflictDoUpdate({
+						target: [history.serverId, history.historyKey],
+						// Refresh the denormalised fields but never viewedAt — a
+						// re-sync should correct a title, not move a view in time.
+						set: {
+							title: sql`excluded.title`,
+							parentTitle: sql`excluded.parent_title`,
+							grandparentTitle: sql`excluded.grandparent_title`,
+							thumb: sql`excluded.thumb`,
+							grandparentThumb: sql`excluded.grandparent_thumb`,
+							duration: sql`excluded.duration`,
+							syncedAt: sql`excluded.synced_at`
+						}
+					})
+					.returning({ historyKey: history.historyKey });
+				walk.inserted += written.length;
+			}
+		}
+
+		// A short page means we've reached the end regardless of what the
+		// container claimed the total was.
+		if (page.entries.length < HISTORY_PAGE_SIZE) break;
+		start += HISTORY_PAGE_SIZE;
+	}
+
+	return walk;
+}
+
+/**
+ * Whose history to pull from a server, and the label recorded for it.
+ *
+ * On a server you own, every user's — the activity views default to you, so
+ * this changes nothing on screen until a user is picked, but the data has to
+ * already be there for the picker to have anything to offer and back-filling
+ * someone else's history later would mean a second full walk.
+ */
+export function historyScopeFor(
+	server: Pick<Server, 'owned'>,
+	serverAccountId: number | null
+): { accountFilter: number | null; scope: 'all' | 'self' } {
+	const accountFilter = server.owned ? null : serverAccountId;
+	return { accountFilter, scope: accountFilter === null ? 'all' : 'self' };
 }
 
 async function syncServer(
@@ -216,15 +327,9 @@ async function syncServer(
 		error: null
 	};
 
-	const target: ServerTarget = {
-		clientId,
-		accessToken: server.accessToken,
-		// The last known-good address is tried first, then the rest. Re-probing
-		// every candidate on every sync would add seconds per server.
-		connections: [server.baseUrl, ...(server.connections?.split('\n') ?? [])].filter(
-			(uri, index, all): uri is string => Boolean(uri) && all.indexOf(uri) === index
-		)
-	};
+	// The last known-good address is tried first, then the rest. Re-probing every
+	// candidate on every sync would add seconds per server.
+	const target = targetFor(server, clientId);
 
 	try {
 		const baseUrl = await resolveBaseUrl(target);
@@ -244,16 +349,7 @@ async function syncServer(
 
 		await recordServerAccounts(server.clientIdentifier, roster, serverAccountId, account);
 
-		/*
-		 * On a server you own, pull every user's history rather than just your own.
-		 *
-		 * The activity views default to you, so this changes nothing on screen
-		 * until a user is picked — but the data has to already be there for the
-		 * picker to have anything to offer, and back-filling someone else's history
-		 * later would mean a second full walk.
-		 */
-		const accountFilter = server.owned ? null : serverAccountId;
-		const desiredScope = accountFilter === null ? 'all' : 'self';
+		const { accountFilter, scope: desiredScope } = historyScopeFor(server, serverAccountId);
 
 		/*
 		 * A widening of scope has to re-walk from the beginning.
@@ -275,63 +371,14 @@ async function syncServer(
 				: Math.max(0, (await newestViewedAt(server.clientIdentifier, account.id)) - 3600);
 		const syncedAt = Math.floor(Date.now() / 1000);
 
-		let start = 0;
-		let total = Infinity;
-
-		while (start < total && result.scanned < MAX_ROWS_PER_SYNC) {
-			const page = await fetchHistoryPage(baseUrl, target, {
-				serverAccountId: accountFilter,
-				viewedAfter: watermark > 0 ? watermark : undefined,
-				start,
-				size: HISTORY_PAGE_SIZE
-			});
-
-			total = page.totalSize;
-			result.scanned += page.entries.length;
-
-			const rows: NewHistoryRow[] = [];
-			for (const entry of page.entries) {
-				const row = toRow(entry, server.clientIdentifier, account.id, syncedAt);
-				if (!row) continue;
-				if (!isPlausibleViewedAt(row.viewedAt, syncedAt)) {
-					result.skipped++;
-					continue;
-				}
-				rows.push(row);
-			}
-
-			if (rows.length > 0) {
-				// Chunked because SQLite caps variables per statement and each row
-				// carries ~20 of them.
-				for (let offset = 0; offset < rows.length; offset += 200) {
-					const chunk = rows.slice(offset, offset + 200);
-					const written = await db
-						.insert(history)
-						.values(chunk)
-						.onConflictDoUpdate({
-							target: [history.serverId, history.historyKey],
-							// Refresh the denormalised fields but never viewedAt — a
-							// re-sync should correct a title, not move a view in time.
-							set: {
-								title: sql`excluded.title`,
-								parentTitle: sql`excluded.parent_title`,
-								grandparentTitle: sql`excluded.grandparent_title`,
-								thumb: sql`excluded.thumb`,
-								grandparentThumb: sql`excluded.grandparent_thumb`,
-								duration: sql`excluded.duration`,
-								syncedAt: sql`excluded.synced_at`
-							}
-						})
-						.returning({ historyKey: history.historyKey });
-					result.inserted += written.length;
-				}
-			}
-
-			// A short page means we've reached the end regardless of what the
-			// container claimed the total was.
-			if (page.entries.length < HISTORY_PAGE_SIZE) break;
-			start += HISTORY_PAGE_SIZE;
-		}
+		const walk = await walkHistory(baseUrl, target, server.clientIdentifier, account.id, {
+			accountFilter,
+			watermark,
+			syncedAt
+		});
+		result.inserted = walk.inserted;
+		result.scanned = walk.scanned;
+		result.skipped = walk.skipped;
 
 		// Self-heal: drop anything stored before this rule existed, or admitted
 		// under an earlier one. Without it a bad row synced yesterday would sit in

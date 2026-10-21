@@ -1,15 +1,29 @@
 <script lang="ts">
 	import Nav from '$lib/components/Nav.svelte';
 	import OnAir from '$lib/components/home/OnAir.svelte';
+	import NowPlaying from '$lib/components/home/NowPlaying.svelte';
 	import ActivityStrip from '$lib/components/home/ActivityStrip.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { formatBytes } from '$lib/components/quality/format';
-	import { createSync } from '$lib/sync.svelte';
+	import { createSync, getActivityPoll } from '$lib/sync.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const sync = createSync();
+
+	/*
+	 * Live sessions come from the layout's poll rather than this page's load.
+	 *
+	 * They're only true for the moment they're read, so rendering them server-side
+	 * would ship a snapshot that's already stale by the time it paints and then
+	 * never moves. The poll refreshes them in place instead. `polled` is passed
+	 * alongside so the panel can say "checking…" until the first answer rather
+	 * than claiming an empty house it hasn't verified.
+	 */
+	const activity = getActivityPoll();
+	const sessions = $derived(activity?.sessions ?? []);
+	const polled = $derived(activity?.polled ?? false);
 
 	function gapPoster(gap: { serverId: string; thumb: string | null }): string | null {
 		if (!gap.thumb) return null;
@@ -114,9 +128,25 @@
 			</Button>
 		</div>
 	{:else}
-		<div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
-			<div class="rounded-xl border p-4 sm:p-5">
-				<OnAir episodes={home.onAir} counts={home.onAirCounts} timeZone={data.timeZone} />
+		<!--
+			Now playing leads the page.
+
+			It's the only panel describing this instant rather than a stored fact, and
+			it's what someone opening the dashboard is actually checking. Everything
+			else — what's scheduled, what's missing, what's on disk — is still true in
+			an hour, so it can wait below.
+		-->
+		<NowPlaying {sessions} known={polled} />
+
+		<div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+			<div class="grid gap-3 sm:grid-cols-2">
+				{#each tiles as tile (tile.label)}
+					<div class="rounded-xl border bg-card/50 p-4">
+						<div class="text-xs text-muted-foreground">{tile.label}</div>
+						<div class="tabular mt-1 text-2xl font-semibold tracking-tight">{tile.value}</div>
+						<div class="mt-0.5 truncate text-[11px] text-muted-foreground">{tile.hint}</div>
+					</div>
+				{/each}
 			</div>
 
 			<aside class="flex flex-col gap-4">
@@ -172,14 +202,10 @@
 			</aside>
 		</div>
 
-		<div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-			{#each tiles as tile (tile.label)}
-				<div class="rounded-xl border bg-card/50 p-4">
-					<div class="text-xs text-muted-foreground">{tile.label}</div>
-					<div class="tabular mt-1 text-2xl font-semibold tracking-tight">{tile.value}</div>
-					<div class="mt-0.5 truncate text-[11px] text-muted-foreground">{tile.hint}</div>
-				</div>
-			{/each}
+		<!-- Demoted to the foot of the page and to a plain block: the schedule is a
+		     week's worth of context, not something to check on arrival. -->
+		<div class="mt-6 border-t pt-4">
+			<OnAir episodes={home.onAir} counts={home.onAirCounts} timeZone={data.timeZone} compact />
 		</div>
 
 		<p class="tabular mt-8 border-t pt-4 text-xs text-muted-foreground">

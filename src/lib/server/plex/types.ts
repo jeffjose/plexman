@@ -110,4 +110,47 @@ export interface PlexLibrarySection {
 	title: string;
 	type: string;
 	uuid?: string;
+	/**
+	 * A counter, not a timestamp, whatever the name suggests — a real server
+	 * reports values like 6586721 next to a `scannedAt` of 1785907675. Plex bumps
+	 * it whenever the section's contents change, which makes it the cheapest
+	 * possible "is there anything new here" signal: unchanged counter, no work.
+	 */
+	contentChangedAt?: number;
+	/** Unix seconds of the last scan. Moves whether or not the scan found
+	 *  anything, so it's a weaker signal than `contentChangedAt` and used only
+	 *  when that's missing. */
+	scannedAt?: number;
+	/** Metadata-agent settings changed. Unrelated to contents. */
+	updatedAt?: number;
+	/** True while a scan is in flight. */
+	refreshing?: boolean;
+}
+
+/**
+ * An in-progress playback from `/status/sessions`.
+ *
+ * This is the only view of a play *while it is happening*: a history row isn't
+ * written until Plex scrobbles the item, around 90% through, so anything
+ * currently on screen is invisible to the history endpoint. Sessions are never
+ * stored — they describe a moment, not a fact about the past.
+ */
+export interface PlexSession {
+	sessionKey?: string;
+	ratingKey?: string;
+	type?: string;
+	title?: string;
+	parentTitle?: string;
+	grandparentTitle?: string;
+	index?: number;
+	parentIndex?: number;
+	year?: number;
+	thumb?: string;
+	grandparentThumb?: string;
+	parentThumb?: string;
+	/** Milliseconds into the item. */
+	viewOffset?: number;
+	duration?: number;
+	User?: { id?: string; title?: string; thumb?: string };
+	Player?: { title?: string; product?: string; state?: string; address?: string };
 }

@@ -10,16 +10,27 @@
 	import { TYPE_LABELS, type TimelineItem } from '$lib/activity/types';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { Button } from '$lib/components/ui/button';
+	import ViewerBadge from './ViewerBadge.svelte';
 
 	interface Props {
 		items: TimelineItem[];
 		timeZone: string;
 		hasMore: boolean;
 		loading: boolean;
+		/**
+		 * Whether these rows can belong to different people.
+		 *
+		 * Decided by the caller from the active scope rather than by looking at the
+		 * rows: a page that happens to contain one person doesn't mean the view is
+		 * about one person, and a badge that appears halfway down the timeline when
+		 * the next page loads is worse than one that's always there. When the scope
+		 * is a single viewer, every badge would read the same and says nothing.
+		 */
+		showViewers?: boolean;
 		onloadmore: () => void;
 	}
 
-	let { items, timeZone, hasMore, loading, onloadmore }: Props = $props();
+	let { items, timeZone, hasMore, loading, showViewers = false, onloadmore }: Props = $props();
 
 	const today = $derived(todayKey(timeZone));
 
@@ -40,6 +51,13 @@
 		}
 		return groups;
 	});
+
+	/** How many distinct people a day's rows cover — the number that turns a long
+	 *  list into "a busy evening for four of us" rather than an undifferentiated
+	 *  pile. */
+	function viewerCount(dayItems: TimelineItem[]): number {
+		return new Set(dayItems.map((item) => item.viewer?.id).filter(Boolean)).size;
+	}
 
 	/**
 	 * Fires `onloadmore` when the sentinel below the list scrolls into view.
@@ -80,6 +98,12 @@
 			>
 				<h3 class="text-sm font-medium">{formatDayLong(section.date)}</h3>
 				<span class="text-xs text-muted-foreground">{relativeDay(section.date, today)}</span>
+				{#if showViewers}
+					{@const people = viewerCount(section.items)}
+					{#if people > 1}
+						<span class="tabular text-xs text-muted-foreground">· {people} people</span>
+					{/if}
+				{/if}
 				<span class="tabular ml-auto text-xs text-muted-foreground">
 					{section.items.length}
 				</span>
@@ -124,7 +148,23 @@
 							{/if}
 						</div>
 
-						<div class="shrink-0 text-right">
+						{#if showViewers}
+							<!-- Name where there's room, colour alone where there isn't. The
+							     badge is the same colour either way, so a narrow screen loses
+							     the label but not the ability to tell two people apart. -->
+							<ViewerBadge viewer={item.viewer} showName class="hidden w-28 shrink-0 sm:flex" />
+							<ViewerBadge viewer={item.viewer} class="w-5 shrink-0 sm:hidden" />
+						{/if}
+
+						<!--
+							Fixed width, not `shrink-0`.
+
+							`formatTime` produces "9:41 PM" on one row and "11:41 PM" on the
+							next, so an auto-width column is a different width per row — and
+							everything to its left, the whole viewer column included, shifts
+							with it. Pinning the width is what makes the badges line up.
+						-->
+						<div class="w-16 shrink-0 text-right">
 							<div class="tabular text-xs">{formatTime(item.viewedAt, timeZone)}</div>
 							{#if formatDuration(item.duration)}
 								<div class="tabular text-[11px] text-muted-foreground">

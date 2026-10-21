@@ -1,4 +1,5 @@
 import type { Handle } from '@sveltejs/kit';
+import { startScheduler } from '$lib/server/sync/scheduler';
 import { resolveSession, SESSION_COOKIE } from '$lib/server/auth/session';
 import { TIMEZONE_COOKIE, isValidTimeZone } from '$lib/server/timezone';
 import {
@@ -9,6 +10,14 @@ import {
 	setServerScope,
 	setUserScope
 } from '$lib/server/preferences';
+
+/*
+ * Started at module load, which is the only place a SvelteKit server has that
+ * runs once and isn't tied to a request. Doing it inside `handle` would mean the
+ * background sync never starts until someone visits — exactly the case it exists
+ * to cover.
+ */
+startScheduler();
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.account = await resolveSession(event.cookies.get(SESSION_COOKIE));

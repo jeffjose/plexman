@@ -8,15 +8,18 @@
 		episodes: ScheduleEpisode[];
 		counts: { missing: number; held: number; upcoming: number };
 		timeZone: string;
+		/** Quieter and shorter, for when this sits below the fold rather than
+		 *  leading the page. Same information, less of it and less loudly. */
+		compact?: boolean;
 	}
 
-	let { episodes, counts, timeZone }: Props = $props();
+	let { episodes, counts, timeZone, compact = false }: Props = $props();
 
 	const today = $derived(todayKey(timeZone));
 
 	/** Rows drawn before the rest is left to the Schedule page. A dashboard
 	 *  panel that scrolls has stopped being a summary. */
-	const MAX_ROWS = 12;
+	const MAX_ROWS = $derived(compact ? 6 : 12);
 
 	interface Row {
 		id: string;
@@ -139,8 +142,10 @@
 
 <section>
 	<div class="mb-2 flex items-baseline gap-2">
-		<h2 class="text-sm font-medium">On air</h2>
-		<span class="text-xs text-muted-foreground">shows you're keeping up with</span>
+		<h2 class="text-sm font-medium {compact ? 'text-muted-foreground' : ''}">On air</h2>
+		{#if !compact}
+			<span class="text-xs text-muted-foreground">shows you're keeping up with</span>
+		{/if}
 		<a
 			href={resolve('/schedule')}
 			class="ml-auto text-xs text-muted-foreground underline-offset-4 hover:underline"
@@ -173,7 +178,9 @@
 							<StatusMark status={row.status} gap={row.gap} />
 
 							<div
-								class="relative size-11 shrink-0 overflow-hidden rounded-md bg-muted"
+								class="relative {compact
+									? 'size-8'
+									: 'size-11'} shrink-0 overflow-hidden rounded-md bg-muted"
 								style="box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--foreground) 8%, transparent)"
 							>
 								{#if poster}

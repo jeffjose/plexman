@@ -26,7 +26,7 @@ import {
 	LEAF_TYPE,
 	LIBRARY_PAGE_SIZE
 } from '../plex/library';
-import { resolveBaseUrl, type ServerTarget } from '../plex/server';
+import { resolveBaseUrl, targetFor, type ServerTarget } from '../plex/server';
 import type { PlexLibraryEntry } from '../plex/library';
 
 export interface SectionSyncResult {
@@ -163,11 +163,24 @@ async function newestAddedAt(serverId: string, sectionKey: string): Promise<numb
 	return row?.addedAt ?? 0;
 }
 
-async function syncSection(
+/**
+ * Walks one section and records where it got to.
+ *
+ * Exported because the light sync runs exactly this against the handful of
+ * sections whose change counter moved, rather than every section on the server.
+ */
+export async function syncSection(
 	baseUrl: string,
 	target: ServerTarget,
 	serverId: string,
-	section: { key: string; title: string; type: string },
+	section: {
+		key: string;
+		title: string;
+		type: string;
+		/** Plex's live change stamps, recorded only if the walk succeeds. */
+		contentChangedAt?: number;
+		scannedAt?: number;
+	},
 	full: boolean
 ): Promise<SectionSyncResult> {
 	const result: SectionSyncResult = {
@@ -256,6 +269,11 @@ async function syncSection(
 			.update(librarySections)
 			.set({
 				lastAddedAt: await newestAddedAt(serverId, section.key),
+				// Recorded here rather than when the section list was read, so a walk
+				// that threw leaves the old stamp behind and gets retried. Storing it
+				// up front would mark a section clean that was never actually read.
+				contentChangedAt: section.contentChangedAt ?? null,
+				scannedAt: section.scannedAt ?? null,
 				lastSyncedAt: syncedAt,
 				itemCount: Number(counted?.n ?? 0),
 				updatedAt: syncedAt
@@ -294,13 +312,7 @@ export async function syncLibrary(
 	const now = Math.floor(Date.now() / 1000);
 
 	for (const server of targets) {
-		const target: ServerTarget = {
-			clientId,
-			accessToken: server.accessToken,
-			connections: [server.baseUrl, ...(server.connections?.split('\n') ?? [])].filter(
-				(uri, index, all): uri is string => Boolean(uri) && all.indexOf(uri) === index
-			)
-		};
+		const target = targetFor(server, clientId);
 
 		let baseUrl: string;
 		try {
@@ -338,7 +350,13 @@ export async function syncLibrary(
 					baseUrl,
 					target,
 					server.clientIdentifier,
-					{ key: String(section.key), title: section.title, type: section.type },
+					{
+						key: String(section.key),
+						title: section.title,
+						type: section.type,
+						contentChangedAt: section.contentChangedAt,
+						scannedAt: section.scannedAt
+					},
 					full
 				)
 			);

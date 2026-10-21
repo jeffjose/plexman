@@ -5,18 +5,33 @@
 
 import { plexFetch, PlexError } from './client';
 import { HISTORY_PAGE_SIZE } from './constants';
-import type {
-	PlexHistoryEntry,
-	PlexMediaContainer,
-	PlexServerAccount,
-	PlexLibrarySection
-} from './types';
+import type { PlexHistoryEntry, PlexMediaContainer, PlexServerAccount, PlexSession } from './types';
 
 export interface ServerTarget {
 	clientId: string;
 	accessToken: string;
 	/** Candidate base URLs, best-first. */
 	connections: string[];
+}
+
+/**
+ * How to reach a stored server: its last known-good address first, then every
+ * other candidate, deduplicated.
+ *
+ * Every sync needs this and each used to build it inline, which meant three
+ * copies of the same "and don't try the same URI twice" filter.
+ */
+export function targetFor(
+	server: { accessToken: string; baseUrl: string | null; connections: string | null },
+	clientId: string
+): ServerTarget {
+	return {
+		clientId,
+		accessToken: server.accessToken,
+		connections: [server.baseUrl, ...(server.connections?.split('\n') ?? [])].filter(
+			(uri, index, all): uri is string => Boolean(uri) && all.indexOf(uri) === index
+		)
+	};
 }
 
 /**
@@ -62,15 +77,20 @@ export async function getServerAccounts(
 	return data.MediaContainer?.Account ?? [];
 }
 
-export async function getLibrarySections(
-	baseUrl: string,
-	target: ServerTarget
-): Promise<PlexLibrarySection[]> {
-	const data = await plexFetch<PlexMediaContainer<never>>(baseUrl, 'library/sections', {
+/**
+ * What's playing right now.
+ *
+ * Cheap enough to poll — 15ms against a real server, and the response is empty
+ * most of the time. Nothing here is persisted: a session is a moment, and the
+ * durable record of it arrives later as a history row.
+ */
+export async function getSessions(baseUrl: string, target: ServerTarget): Promise<PlexSession[]> {
+	const data = await plexFetch<PlexMediaContainer<PlexSession>>(baseUrl, 'status/sessions', {
 		clientId: target.clientId,
-		token: target.accessToken
+		token: target.accessToken,
+		timeoutMs: 10_000
 	});
-	return data.MediaContainer?.Directory ?? [];
+	return data.MediaContainer?.Metadata ?? [];
 }
 
 /**

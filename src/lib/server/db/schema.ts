@@ -178,6 +178,22 @@ export const librarySections = sqliteTable(
 		hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
 		/** Newest `addedAt` already stored, the incremental sync watermark. */
 		lastAddedAt: integer('last_added_at'),
+		/**
+		 * Plex's own change counter for this section, as of the last successful walk.
+		 *
+		 * `contentChangedAt` is a monotonic generation number — not a timestamp,
+		 * despite the name — that the server bumps on any add, edit or delete within
+		 * the section. Comparing it against the live value is what lets a poll decide
+		 * a section is untouched without asking the section anything: one
+		 * `/library/sections` call covers every library on the server.
+		 *
+		 * `scannedAt` is the fallback for servers old enough not to send the counter.
+		 * It moves on every scan rather than only on real changes, so it's a coarser
+		 * signal — false "changed" verdicts, never false "unchanged" ones, which is
+		 * the safe direction to be wrong in.
+		 */
+		contentChangedAt: integer('content_changed_at'),
+		scannedAt: integer('scanned_at'),
 		lastSyncedAt: integer('last_synced_at'),
 		itemCount: integer('item_count').notNull().default(0),
 		updatedAt: integer('updated_at').notNull()

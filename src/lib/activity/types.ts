@@ -45,9 +45,22 @@ export const TYPE_COLORS: Record<MediaType, string> = {
  * can name the type without importing from `$lib/server`, which SvelteKit
  * refuses to let client code touch.
  */
+export interface Viewer {
+	/** `serverId:serverAccountId`, matching the scope picker's values — so a row
+	 *  can be turned into a filter without a second lookup. */
+	id: string;
+	name: string;
+}
+
 export interface TimelineItem {
 	serverId: string;
 	historyKey: string;
+	/**
+	 * Who watched it. Null when the row predates user tracking or the server
+	 * didn't report an account — an unattributed play is still a play, so it's
+	 * shown rather than hidden, just without a name.
+	 */
+	viewer: Viewer | null;
 	type: MediaType;
 	rawType: string;
 	/** Show title for episodes, film title otherwise. */

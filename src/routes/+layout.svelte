@@ -2,9 +2,30 @@
 	import '../app.css';
 	import { invalidateAll } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { createActivityPoll, setActivityPoll } from '$lib/sync.svelte';
 	import type { LayoutData } from './$types';
 
 	let { children, data }: { children: import('svelte').Snippet; data: LayoutData } = $props();
+
+	/**
+	 * Keep the page current without anyone pressing anything.
+	 *
+	 * It lives in the layout rather than on a page because every view is a
+	 * different reading of the same data — an episode finishing should land on
+	 * whichever one you happen to be looking at. Signed-out visitors have nothing
+	 * to poll for, and the endpoint would 401 at them every 90 seconds.
+	 */
+	const activity = setActivityPoll(createActivityPoll());
+
+	// Reading the id rather than the account object: `data` is replaced on every
+	// load, so depending on the object itself would restart the poll each time one
+	// of its own polls invalidated the page.
+	const accountId = $derived(data.account?.id ?? null);
+
+	$effect(() => {
+		if (accountId === null) return;
+		return activity.start();
+	});
 
 	/**
 	 * Tell the server which zone to bucket history into.
